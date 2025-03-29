@@ -17,7 +17,7 @@ extern "C" {
 
 void decode(VideoPacketQueue& packet_queue, const char* output_file) {
     LOGI("Starting the decoding process");  // 输出信息日志，表示解码过程开始
-    const AVCodec* codec = avcodec_find_decoder(AV_CODEC_ID_H264);
+    const AVCodec* codec = avcodec_find_decoder_by_name("h264");
     if (!codec) {
         LOGE("Codec not found");
         return;

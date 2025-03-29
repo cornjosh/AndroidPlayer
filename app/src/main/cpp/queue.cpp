@@ -22,9 +22,15 @@ VideoPacketQueue::~VideoPacketQueue() {
     LOGV("All packets in the queue have been freed");  // 队列中所有包已释放的详细日志
 }
 
+// 读取包详情
+void getPacketDetails(AVPacket* packet) {
+    LOGV("Packet size: %d, pts: %lld, dts: %lld", packet->size, packet->pts, packet->dts);  // 输出包的大小、PTS和DTS的详细日志
+}
+
 void VideoPacketQueue::put(AVPacket* packet) {
     LOGV("Attempting to put a packet into the queue");  // 尝试将包放入队列的详细日志
     std::unique_lock<std::mutex> lock(mutex);
+    getPacketDetails(packet);  // 获取包的详细信息
     queue.push(packet);
     cond.notify_one();
     LOGV("A packet has been successfully put into the queue");  // 包成功放入队列的详细日志
@@ -47,6 +53,7 @@ int VideoPacketQueue::get(AVPacket* packet, bool block) {
     AVPacket* pkt = queue.front();
     queue.pop();
     av_packet_move_ref(packet, pkt);
+    getPacketDetails(packet);  // 获取包的详细信息
     av_packet_free(&pkt);
     LOGV("A packet has been successfully retrieved from the queue");  // 包成功从队列获取的详细日志
     return 0;
