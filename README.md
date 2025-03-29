@@ -51,8 +51,18 @@ else
 fi
 ```
 
+### 处理 FFmpeg 头文件
+
+- 将 FFmpeg 的头文件复制到 `jniLibs` 目录下，方便后续的编译和使用
+- 更新 `CMakeLists.txt` 文件，添加 FFmpeg 的头文件路径
+
+```cmake
+include_directories(${ffmpeg_head_dir}/../jniLibs/include)
+```
+
 ### TODO
 - [x] 交叉编译 FFmpeg 静态库
 - [x] 打包成一个动态库
 - [ ] 按需打包：等待后面的作业需求
 
+## 
