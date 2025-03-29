@@ -21,7 +21,7 @@
 - 得到的 `video packet` 需要放入到 `queue` 中
 - 创建 `decoder.cpp` 文件，实现 `decode` 线程，对 `video packet` 进行解码，得到 `video frame`
 - 需要从 `queue` 中获取 `video packet` 进行解码
-- 解码后的 `video frame` 需要以 `YUV420P` 格式存储到文件中
+- 解码后的 `video frame` 需要以 `YUV420` 格式存储到文件中
 
 ![屏幕截图 2025-03-29 084654.png](img/%E5%B1%8F%E5%B9%95%E6%88%AA%E5%9B%BE%202025-03-29%20084654.png)
 
