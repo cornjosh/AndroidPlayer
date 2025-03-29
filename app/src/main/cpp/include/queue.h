@@ -1,7 +1,4 @@
-//
-// Created by zylnt on 2025/3/29.
-//
-
+// queue.h
 #ifndef QUEUE_H
 #define QUEUE_H
 
@@ -9,7 +6,6 @@
 #include <mutex>
 #include <condition_variable>
 #include <memory>
-
 extern "C" {
 #include <libavcodec/avcodec.h>
 }
@@ -20,12 +16,12 @@ public:
     ~VideoPacketQueue();
 
     void put(AVPacket* packet);
-    int get(AVPacket* packet, bool block);
+    AVPacket* get();
 
 private:
-    std::queue<AVPacket*> queue;
-    std::mutex mutex;
-    std::condition_variable cond;
+    std::queue<AVPacket*> queue_;
+    std::mutex mutex_;
+    std::condition_variable cond_;
 };
 
 #endif // QUEUE_H
