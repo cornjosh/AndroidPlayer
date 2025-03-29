@@ -10,6 +10,15 @@
 - 需要从 `queue` 中获取 `video packet` 进行解码
 - 解码后的 `video frame` 需要以 `YUV420P` 格式存储到文件中
 
+
+## 初始化项目
+
+- 使用示例代码创建一个 Android Studio 项目
+- 使用 git 管理代码，设置 remote
+- 尝试编译运行示例代码，发现编译错误，没有 `log.h` 文件
+- 创建 `log.h` 文件，添加 `#include <android/log.h>` 头文件
+- 创建 `/src/main/assets/testfile.mp4` 文件，添加测试视频文件
+
 ## 交叉编译 FFmpeg
 
 - 修改之前作业中的 `ffmpeg.sh` 脚本，把动态库的编译和安装部分注释掉，改为静态库的编译和安装，并生成
