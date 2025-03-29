@@ -29,6 +29,7 @@ set(ffmpeg_lib_dir ${CMAKE_SOURCE_DIR}/../jniLibs/${ANDROID_ABI})
 set(ffmpeg_head_dir ${CMAKE_SOURCE_DIR})
 
 include_directories(${ffmpeg_head_dir}/include)
+include_directories(${ffmpeg_head_dir}/../jniLibs/include)
 
 find_library(
         log-lib
