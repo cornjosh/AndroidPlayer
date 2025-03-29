@@ -101,3 +101,26 @@ AVPacket* VideoPacketQueue::get() {
     return packet;
 }
 ```
+
+## 实现 demux 线程
+
+- 创建 `demuxer.cpp` 文件
+- 实现 `demux` 线程，对原视频进行解封装，得到 `video packet`
+- 得到的 `video packet` 需要放入到 `queue` 中
+- 使用 FFmpeg 的 `av_read_frame` 函数来读取视频数据
+- 使用 `av_packet_split_side_data` 函数来分离视频数据
+- 遍历所有流，查找视频流的索引
+- 将视频流放入到 `queue` 中
+- 其他流丢弃
+
+## 实现 decode 线程
+
+- 创建 `decoder.cpp` 文件
+- 实现 `decode` 线程，对 `video packet` 进行解码，得到 `video frame`
+- 需要从 `queue` 中获取 `video packet` 进行解码
+- 解码后的 `video frame` 需要以 `YUV420P` 格式存储到文件中
+- 使用 FFmpeg 的 `avcodec_decode_video2` 函数来解码视频数据
+- 使用 `av_frame_get_buffer` 函数来分配内存
+- 将 queue 中的 `video packet` 进行解码
+- 将解码后的 `video frame` 直接写入到文件中
+- 最后关闭文件，释放内存
