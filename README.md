@@ -80,3 +80,24 @@ include_directories(${ffmpeg_head_dir}/../jniLibs/include)
 - [ ] 按需打包：等待后面的作业需求
 
 ## 实现一个线程安全的队列
+
+- 创建 `queue.h` 和 `queue.cpp` 文件
+- 实现一个线程安全的队列，使用 `std::mutex` 和 `std::condition_variable` 来实现线程安全
+- 使用 `std::queue` 来存储数据
+- 实现 `put` 和 `pop` 方法
+
+```cpp
+void VideoPacketQueue::put(AVPacket* packet) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    queue_.push(packet);
+    cond_.notify_one();
+}
+
+AVPacket* VideoPacketQueue::get() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    cond_.wait(lock, [this] { return!queue_.empty(); });
+    AVPacket* packet = queue_.front();
+    queue_.pop();
+    return packet;
+}
+```
