@@ -2,10 +2,10 @@
 #include <iostream>
 #include <thread>
 #include "queue.h"
-#include "log.h"  // 包含日志头文件
-#include "ffmpeg.h"
+#include "log.h"
 
 #define LOG_TAG "Demuxer"  // 定义日志标签
+
 
 extern "C" {
 #include <libavformat/avformat.h>
@@ -21,7 +21,9 @@ void demux(const char* input_file, VideoPacketQueue& packet_queue) {
     int ret = avformat_open_input(&format_context, input_file, nullptr, nullptr);
     if (ret != 0) {
         LOGE("Failed to open input file: %s", input_file);
-        print_ffmpeg_error(ret);
+        char errbuf[AV_ERROR_MAX_STRING_SIZE];
+        av_strerror(ret, errbuf, AV_ERROR_MAX_STRING_SIZE);
+        LOGE("FFmpeg error: %s", errbuf);
         return;
     }
     LOGV("Successfully opened input file: %s", input_file);
@@ -30,7 +32,9 @@ void demux(const char* input_file, VideoPacketQueue& packet_queue) {
     ret = avformat_find_stream_info(format_context, nullptr);
     if (ret < 0) {
         LOGE("Failed to find stream information");
-        print_ffmpeg_error(ret);
+        char errbuf[AV_ERROR_MAX_STRING_SIZE];
+        av_strerror(ret, errbuf, AV_ERROR_MAX_STRING_SIZE);
+        LOGE("FFmpeg error: %s", errbuf);
         avformat_close_input(&format_context);
         return;
     }
@@ -104,7 +108,9 @@ void demux(const char* input_file, VideoPacketQueue& packet_queue) {
     // 处理读取文件时可能出现的错误（除了文件结束标志）
     if (ret < 0 && ret != AVERROR_EOF) {
         LOGE("Error while reading from input file");
-        print_ffmpeg_error(ret);
+        char errbuf[AV_ERROR_MAX_STRING_SIZE];
+        av_strerror(ret, errbuf, AV_ERROR_MAX_STRING_SIZE);
+        LOGE("FFmpeg error: %s", errbuf);
     }
 
     // 释放 AVPacket 资源

@@ -2,8 +2,7 @@
 #include <iostream>
 #include <thread>
 #include "queue.h"
-#include "log.h"  // 包含日志头文件
-#include "ffmpeg.h"
+#include "log.h"
 
 #define LOG_TAG "Decoder"  // 定义日志标签
 
@@ -36,7 +35,9 @@ void decode(VideoPacketQueue& packet_queue, const char* output_file) {
     int ret = avcodec_open2(codec_context, codec, nullptr);
     if (ret < 0) {
         LOGE("Could not open codec");
-        print_ffmpeg_error(ret);
+        char errbuf[AV_ERROR_MAX_STRING_SIZE];
+        av_strerror(ret, errbuf, AV_ERROR_MAX_STRING_SIZE);
+        LOGE("FFmpeg error: %s", errbuf);
         avcodec_free_context(&codec_context);
         return;
     }
@@ -72,7 +73,9 @@ void decode(VideoPacketQueue& packet_queue, const char* output_file) {
         ret = avcodec_send_packet(codec_context, packet);
         if (ret < 0) {
             LOGE("Error sending packet to decoder");
-            print_ffmpeg_error(ret);
+            char errbuf[AV_ERROR_MAX_STRING_SIZE];
+            av_strerror(ret, errbuf, AV_ERROR_MAX_STRING_SIZE);
+            LOGE("FFmpeg error: %s", errbuf);
             av_packet_free(&packet);
             continue;
         }
@@ -84,7 +87,9 @@ void decode(VideoPacketQueue& packet_queue, const char* output_file) {
                 break;
             } else if (ret < 0) {
                 LOGE("Error receiving frame from decoder");
-                print_ffmpeg_error(ret);
+                char errbuf[AV_ERROR_MAX_STRING_SIZE];
+                av_strerror(ret, errbuf, AV_ERROR_MAX_STRING_SIZE);
+                LOGE("FFmpeg error: %s", errbuf);
                 break;
             }
 
@@ -111,7 +116,9 @@ void decode(VideoPacketQueue& packet_queue, const char* output_file) {
             break;
         } else if (ret < 0) {
             LOGE("Error receiving frame from decoder");
-            print_ffmpeg_error(ret);
+            char errbuf[AV_ERROR_MAX_STRING_SIZE];
+            av_strerror(ret, errbuf, AV_ERROR_MAX_STRING_SIZE);
+            LOGE("FFmpeg error: %s", errbuf);
             break;
         }
 
