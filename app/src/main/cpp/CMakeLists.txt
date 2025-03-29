@@ -45,6 +45,8 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         AAudioRender.cpp
         ANWRender.cpp
         queue.cpp
+        demuxer.cpp
+        decoder.cpp
 )
 
 
