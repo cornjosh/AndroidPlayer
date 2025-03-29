@@ -13,13 +13,44 @@
 
 #define LOG_TAG "Main"
 
+// 获取应用的内部存储目录
+std::string getFilesDir(JNIEnv* env, jobject context) {
+    jclass contextClass = env->GetObjectClass(context);
+    jmethodID getFilesDirMethod = env->GetMethodID(contextClass, "getFilesDir", "()Ljava/io/File;");
+    jobject fileObject = env->CallObjectMethod(context, getFilesDirMethod);
+
+    jclass fileClass = env->GetObjectClass(fileObject);
+    jmethodID getPathMethod = env->GetMethodID(fileClass, "getPath", "()Ljava/lang/String;");
+    jstring pathString = (jstring)env->CallObjectMethod(fileObject, getPathMethod);
+
+    const char* path = env->GetStringUTFChars(pathString, nullptr);
+    std::string result(path);
+    env->ReleaseStringUTFChars(pathString, path);
+
+    return result;
+}
+
+
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_example_androidplayer_MainActivity_nativeInit(JNIEnv *env, jclass clazz) {
-    const char* input_file = "testfile.mp4";
-    const char* output_file = "output.yuv";
+Java_com_example_androidplayer_MainActivity_nativeInit(JNIEnv *env, jclass clazz, jobject context) {
+
+    std::string filesDir = "/storage/emulated/0";
+    std::string inputFilePath = filesDir + "/testfile.mp4";
+    std::string outputFilePath = filesDir + "/output.yuv";
+    std::string testFilePath = filesDir + "/test.txt";
+
+
+    const char* input_file = inputFilePath.c_str();
+    const char* output_file = outputFilePath.c_str();
 
     LOGI("Starting video processing...");
+    LOGI("Input file path: %s", input_file);
+    LOGI("Output file path: %s", output_file);
+
+    char WriteFileFolder[100];
+
+    sprintf(WriteFileFolder, "%s/DocumentTest", testFilePath.c_str());
 
     // 创建队列
     VideoPacketQueue packet_queue;

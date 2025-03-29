@@ -3,6 +3,7 @@ package com.example.androidplayer;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
@@ -33,7 +34,8 @@ public class MainActivity extends AppCompatActivity {
 
 
         // Initialize native library
-        nativeInit();
+
+        nativeInit(this);
 
 
 
@@ -174,5 +176,5 @@ public class MainActivity extends AppCompatActivity {
         mHandler.sendMessage(msg);
     }
 
-    public static native void nativeInit();
+    public static native void nativeInit(Context context);
 }
