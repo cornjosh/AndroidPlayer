@@ -47,6 +47,7 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         queue.cpp
         demuxer.cpp
         decoder.cpp
+        main.cpp
 )
 
 
