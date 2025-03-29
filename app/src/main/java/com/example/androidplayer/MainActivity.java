@@ -30,6 +30,14 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
+
+        // Initialize native library
+        nativeInit();
+
+
+
+
         super.onCreate(savedInstanceState);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
@@ -165,4 +173,6 @@ public class MainActivity extends AppCompatActivity {
         msg.what = 1;
         mHandler.sendMessage(msg);
     }
+
+    public static native void nativeInit();
 }
