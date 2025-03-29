@@ -124,3 +124,11 @@ AVPacket* VideoPacketQueue::get() {
 - 将 queue 中的 `video packet` 进行解码
 - 将解码后的 `video frame` 直接写入到文件中
 - 最后关闭文件，释放内存
+
+## 创建线程
+
+- 在 `main.cpp` 中创建 `demux` 和 `decode` 线程
+- 使用 `std::thread` 来创建线程
+- 使用 `std::thread::join` 来等待线程结束
+- 在 mainActivity 中调用 `main` 函数
+- 暂时将 `main` 函数放在主线程中运行，后期会改为在子线程中运行，避免阻塞 UI 线程
