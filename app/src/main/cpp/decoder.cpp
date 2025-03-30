@@ -53,7 +53,8 @@ void decodeThread(PacketQueue* packetQueue, FrameQueue* frameQueue, AVCodecParam
         return;
     }
 
-    while (!packetQueue->isFinished() || (pkt = packetQueue->pop()) != nullptr) {
+    while (!(packetQueue->isFinished() && packetQueue->empty() )) {
+        pkt = packetQueue->pop();
         if (!pkt) continue;
 
         LOGD("📦 Packet %p send from queue: time=%.3f pts=%lld dts=%lld duration=%lld size=%d",

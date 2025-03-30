@@ -46,3 +46,8 @@ bool PacketQueue::isFinished() const {
     std::unique_lock<std::mutex> lock(mtx);
     return finished;
 }
+
+bool PacketQueue::empty() const {
+    std::unique_lock<std::mutex> lock(mtx);
+    return queue.empty();
+}

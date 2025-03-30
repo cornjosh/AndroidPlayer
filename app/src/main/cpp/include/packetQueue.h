@@ -24,6 +24,7 @@ public:
     void clear();
     void setFinished(bool isFinished);
     bool isFinished() const;
+    bool empty() const;
 
 private:
     std::queue<AVPacket*> queue;
