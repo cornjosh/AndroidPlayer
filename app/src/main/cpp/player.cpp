@@ -49,7 +49,6 @@ Java_com_example_androidplayer_Player_nativePlay(JNIEnv *env, jobject thiz, jstr
         ANativeWindow_release(nativeWindow);
         nativeWindow = nullptr;
     }
-
     nativeWindow = ANativeWindow_fromSurface(env, surface);
     if (!nativeWindow) {
         LOGE("❌ ANativeWindow_fromSurface failed! surface is null.");
@@ -100,9 +99,9 @@ Java_com_example_androidplayer_Player_nativePlay(JNIEnv *env, jobject thiz, jstr
     rendererThread = std::thread(renderThread, frameQueue, nativeWindow, videoTimeBase);
 
     // 可选：detach 或 join 管理线程生命周期
-    demuxerThread.detach();
-    decoderThread.detach();
-    rendererThread.detach();
+    demuxerThread.join();
+    decoderThread.join();
+    rendererThread.join();
 
     return 0;
 }
@@ -120,6 +119,7 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_com_example_androidplayer_Player_nativeSeek(JNIEnv *env, jobject thiz, jdouble position) {
     // TODO: implement nativeSeek()
+    return 0;
 }
 
 
@@ -127,6 +127,7 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_com_example_androidplayer_Player_nativeStop(JNIEnv *env, jobject thiz) {
     // TODO: implement nativeStop()
+    return 0;
 }
 
 
@@ -134,6 +135,7 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_com_example_androidplayer_Player_nativeSetSpeed(JNIEnv *env, jobject thiz, jfloat speed) {
     // TODO: implement nativeSetSpeed()
+    return 0;
 }
 
 
@@ -141,6 +143,7 @@ extern "C"
 JNIEXPORT jdouble JNICALL
 Java_com_example_androidplayer_Player_nativeGetPosition(JNIEnv *env, jobject thiz) {
     // TODO: implement nativeGetPosition()
+    return 0;
 }
 
 
@@ -149,4 +152,5 @@ extern "C"
 JNIEXPORT jdouble JNICALL
 Java_com_example_androidplayer_Player_nativeGetDuration(JNIEnv *env, jobject thiz) {
     // TODO: implement nativeGetDuration()
+    return 0;
 }
