@@ -44,10 +44,11 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
         AAudioRender.cpp
         ANWRender.cpp
-        queue.cpp
-        demuxer.cpp
-        decoder.cpp
-        main.cpp
+#        queue.cpp
+#        demuxer.cpp
+#        decoder.cpp
+        renderer.cpp
+        player.cpp
 )
 
 
