@@ -31,6 +31,7 @@ set(ffmpeg_head_dir ${CMAKE_SOURCE_DIR})
 include_directories(${ffmpeg_head_dir}/include)
 include_directories(${ffmpeg_head_dir}/../jniLibs/include)
 
+
 find_library(
         log-lib
         log
@@ -47,16 +48,20 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
 #        queue.cpp
 #        demuxer.cpp
 #        decoder.cpp
-        renderer.cpp
         player.cpp
+        renderer.cpp
+        main.cpp
 )
 
-
+find_library(GLESv2_LIB GLESv2)
+find_library(EGL_LIB EGL)
 # Specifies libraries CMake should link to your target library. You
 # can link libraries from various origins, such as libraries defined in this
 # build script, prebuilt third-party libraries, or Android system libraries.
 target_link_libraries(${CMAKE_PROJECT_NAME}
         # List libraries link to the target library
+        ${GLESv2_LIB}
+        ${EGL_LIB}
         android
         ffmpeg
         log
