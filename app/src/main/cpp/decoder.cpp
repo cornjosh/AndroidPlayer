@@ -1,4 +1,3 @@
-// decoder.cpp
 #include "log.h"
 #define TAG "decoder"
 #include "packetQueue.h"
@@ -36,21 +35,23 @@ void decodeThread(PacketQueue* packetQueue, FrameQueue* frameQueue, AVCodecParam
 
     AVPacket* pkt = nullptr;
     AVFrame* frame = av_frame_alloc();
-    AVFrame* rgbaFrame = av_frame_alloc();
+    struct SwsContext* swsCtx = nullptr;
 
     int width = codecCtx->width;
     int height = codecCtx->height;
+    enum AVPixelFormat srcFormat = codecCtx->pix_fmt;
 
-    // 设置RGBA帧缓冲区
-    int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGBA, width, height, 1);
-    uint8_t* buffer = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t));
-    av_image_fill_arrays(rgbaFrame->data, rgbaFrame->linesize, buffer, AV_PIX_FMT_RGBA, width, height, 1);
-
-    struct SwsContext* swsCtx = sws_getContext(
-            width, height, codecCtx->pix_fmt,
+    // 初始化 sws 上下文
+    swsCtx = sws_getContext(
+            width, height, srcFormat,
             width, height, AV_PIX_FMT_RGBA,
             SWS_BILINEAR, nullptr, nullptr, nullptr
     );
+
+    if (!swsCtx) {
+        LOGE("❌ Failed to create SwsContext");
+        return;
+    }
 
     while (!packetQueue->isFinished() || (pkt = packetQueue->pop()) != nullptr) {
         if (!pkt) continue;
@@ -63,6 +64,7 @@ void decodeThread(PacketQueue* packetQueue, FrameQueue* frameQueue, AVCodecParam
              pkt->duration,
              pkt->size
         );
+
         int ret = avcodec_send_packet(codecCtx, pkt);
         av_packet_free(&pkt);
 
@@ -73,37 +75,52 @@ void decodeThread(PacketQueue* packetQueue, FrameQueue* frameQueue, AVCodecParam
 
         while (ret >= 0) {
             ret = avcodec_receive_frame(codecCtx, frame);
-            if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
-                break;
-            } else if (ret < 0) {
+            if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
+            else if (ret < 0) {
                 LOGE("❌ Error during decoding");
                 break;
             }
 
-            LOGD("✅ Frame decoded: pts=%lld width=%d height=%d", frame->pts, frame->width, frame->height);
+            LOGD("✅ Frame decoded: pts=%lld  size=%dx%d  format=%d",
+                 frame->pts, frame->width, frame->height, frame->format);
 
-            // 转换为RGBA
-            sws_scale(swsCtx, frame->data, frame->linesize, 0, height,
+            // ✅ 创建新的 RGBA 帧（每一帧独立）
+            AVFrame* rgbaFrame = av_frame_alloc();
+            rgbaFrame->format = AV_PIX_FMT_RGBA;
+            rgbaFrame->width = frame->width;
+            rgbaFrame->height = frame->height;
+
+            int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGBA, frame->width, frame->height, 1);
+            uint8_t* buffer = (uint8_t*)av_malloc(numBytes);
+            av_image_fill_arrays(rgbaFrame->data, rgbaFrame->linesize, buffer, AV_PIX_FMT_RGBA, frame->width, frame->height, 1);
+
+            // ✅ 执行转换
+            sws_scale(swsCtx,
+                      frame->data, frame->linesize,
+                      0, frame->height,
                       rgbaFrame->data, rgbaFrame->linesize);
 
-            AVFrame* finalFrame = av_frame_alloc();
-            av_frame_ref(finalFrame, rgbaFrame);
-            finalFrame->height = frame->height;
-            finalFrame->width = frame->width;
-            finalFrame->pts = frame->pts;
+            if (rgbaFrame->linesize[0] <= 0 || rgbaFrame->data[0] == nullptr) {
+                LOGE("❌ Invalid RGBA frame! Skipping...");
+                av_frame_free(&rgbaFrame);
+                av_free(buffer);
+                continue;
+            }
 
-            LOGD("🎨 Frame %p added to frameQueue, size: %dx%d", finalFrame, finalFrame->height, finalFrame->width);
-            frameQueue->push(finalFrame);
+            rgbaFrame->pts = frame->pts;
+
+            LOGD("🎨 RGBA frame %p pushed to queue: size=%dx%d  linesize=%d",
+                 rgbaFrame, rgbaFrame->width, rgbaFrame->height, rgbaFrame->linesize[0]);
+
+            frameQueue->push(rgbaFrame);  // ✅ 拷贝后的帧，safe push
         }
     }
 
     LOGI("🛑 Decoder thread finished");
 
-    // 资源释放
+    // 清理资源
     sws_freeContext(swsCtx);
-    av_free(buffer);
     av_frame_free(&frame);
-    av_frame_free(&rgbaFrame);
     avcodec_free_context(&codecCtx);
     frameQueue->setFinished(true);
 }
