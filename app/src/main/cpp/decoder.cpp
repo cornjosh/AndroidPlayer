@@ -1,142 +1,107 @@
 // decoder.cpp
-#include <iostream>
-#include <thread>
-#include "queue.h"
 #include "log.h"
-
-#define LOG_TAG "Decoder"  // 定义日志标签
+#define TAG "decoder"
+#include "packetQueue.h"
+#include "frameQueue.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavutil/imgutils.h>
+#include <libswscale/swscale.h>
 }
 
+#include <thread>
 
-void decode(VideoPacketQueue& packet_queue, const char* output_file) {
-    LOGI("Starting the decoding process");  // 开始解码过程的信息日志
+void decodeThread(PacketQueue* packetQueue, FrameQueue* frameQueue, AVCodecParameters* codecpar) {
+    LOGI("🔧 Starting decoder thread");
 
-    // 查找解码器
-    const AVCodec* codec = avcodec_find_decoder(AV_CODEC_ID_H264);
+    const AVCodec* codec = avcodec_find_decoder(codecpar->codec_id);
     if (!codec) {
-        LOGE("Could not find codec");
+        LOGE("❌ Decoder not found");
         return;
     }
-    LOGV("Codec found successfully");  // 成功找到解码器的详细日志
 
-    // 分配解码器上下文
-    AVCodecContext* codec_context = avcodec_alloc_context3(codec);
-    if (!codec_context) {
-        LOGE("Could not allocate codec context");
+    AVCodecContext* codecCtx = avcodec_alloc_context3(codec);
+    if (!codecCtx || avcodec_parameters_to_context(codecCtx, codecpar) < 0) {
+        LOGE("❌ Failed to create codec context");
         return;
     }
-    LOGV("Codec context allocated successfully");  // 成功分配解码器上下文的详细日志
 
-    // 打开解码器
-    int ret = avcodec_open2(codec_context, codec, nullptr);
-    if (ret < 0) {
-        LOGE("Could not open codec");
-        char errbuf[AV_ERROR_MAX_STRING_SIZE];
-        av_strerror(ret, errbuf, AV_ERROR_MAX_STRING_SIZE);
-        LOGE("FFmpeg error: %s", errbuf);
-        avcodec_free_context(&codec_context);
+    if (avcodec_open2(codecCtx, codec, nullptr) < 0) {
+        LOGE("❌ Failed to open codec");
         return;
     }
-    LOGV("Codec opened successfully");  // 成功打开解码器的详细日志
 
-    // 分配视频帧
+    LOGI("✅ Decoder initialized");
+
+    AVPacket* pkt = nullptr;
     AVFrame* frame = av_frame_alloc();
-    if (!frame) {
-        LOGE("Could not allocate video frame");
-        avcodec_free_context(&codec_context);
-        return;
-    }
-    LOGV("Video frame allocated successfully");  // 成功分配视频帧的详细日志
+    AVFrame* rgbaFrame = av_frame_alloc();
 
-    // 打开输出文件
-    FILE* output = fopen(output_file, "wb");
-    if (!output) {
-        LOGE("Could not open output file");
-        av_frame_free(&frame);
-        avcodec_free_context(&codec_context);
-        return;
-    }
-    LOGV("Output file opened successfully");  // 成功打开输出文件的详细日志
+    int width = codecCtx->width;
+    int height = codecCtx->height;
 
-    // 从队列中获取数据包并解码
-    while (true) {
-        AVPacket* packet = packet_queue.get();
-        if (!packet) {
-            break;
-        }
+    // 设置RGBA帧缓冲区
+    int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGBA, width, height, 1);
+    uint8_t* buffer = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t));
+    av_image_fill_arrays(rgbaFrame->data, rgbaFrame->linesize, buffer, AV_PIX_FMT_RGBA, width, height, 1);
 
-        // 发送数据包到解码器
-        ret = avcodec_send_packet(codec_context, packet);
+    struct SwsContext* swsCtx = sws_getContext(
+            width, height, codecCtx->pix_fmt,
+            width, height, AV_PIX_FMT_RGBA,
+            SWS_BILINEAR, nullptr, nullptr, nullptr
+    );
+
+    while (!packetQueue->isFinished() || (pkt = packetQueue->pop()) != nullptr) {
+        if (!pkt) continue;
+
+        LOGD("📦 Packet %p send from queue: time=%.3f pts=%lld dts=%lld duration=%lld size=%d",
+             pkt,
+             pkt->pts * av_q2d(codecCtx->time_base),
+             pkt->pts,
+             pkt->dts,
+             pkt->duration,
+             pkt->size
+        );
+        int ret = avcodec_send_packet(codecCtx, pkt);
+        av_packet_free(&pkt);
+
         if (ret < 0) {
-            LOGE("Error sending packet to decoder");
-            char errbuf[AV_ERROR_MAX_STRING_SIZE];
-            av_strerror(ret, errbuf, AV_ERROR_MAX_STRING_SIZE);
-            LOGE("FFmpeg error: %s", errbuf);
-            av_packet_free(&packet);
+            LOGE("❌ Error sending packet to decoder");
             continue;
         }
 
-        // 接收解码后的帧
         while (ret >= 0) {
-            ret = avcodec_receive_frame(codec_context, frame);
+            ret = avcodec_receive_frame(codecCtx, frame);
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
                 break;
             } else if (ret < 0) {
-                LOGE("Error receiving frame from decoder");
-                char errbuf[AV_ERROR_MAX_STRING_SIZE];
-                av_strerror(ret, errbuf, AV_ERROR_MAX_STRING_SIZE);
-                LOGE("FFmpeg error: %s", errbuf);
+                LOGE("❌ Error during decoding");
                 break;
             }
 
-            // 将帧以 YUV420P 格式写入文件
-            for (int i = 0; i < frame->height; i++) {
-                fwrite(frame->data[0] + i * frame->linesize[0], 1, frame->width, output);
-            }
-            for (int i = 0; i < frame->height / 2; i++) {
-                fwrite(frame->data[1] + i * frame->linesize[1], 1, frame->width / 2, output);
-            }
-            for (int i = 0; i < frame->height / 2; i++) {
-                fwrite(frame->data[2] + i * frame->linesize[2], 1, frame->width / 2, output);
-            }
-        }
+            LOGD("✅ Frame decoded: pts=%lld width=%d height=%d", frame->pts, frame->width, frame->height);
 
-        av_packet_free(&packet);
-    }
+            // 转换为RGBA
+            sws_scale(swsCtx, frame->data, frame->linesize, 0, height,
+                      rgbaFrame->data, rgbaFrame->linesize);
 
-    // 刷新解码器
-    avcodec_send_packet(codec_context, nullptr);
-    while (ret >= 0) {
-        ret = avcodec_receive_frame(codec_context, frame);
-        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
-            break;
-        } else if (ret < 0) {
-            LOGE("Error receiving frame from decoder");
-            char errbuf[AV_ERROR_MAX_STRING_SIZE];
-            av_strerror(ret, errbuf, AV_ERROR_MAX_STRING_SIZE);
-            LOGE("FFmpeg error: %s", errbuf);
-            break;
-        }
+            AVFrame* finalFrame = av_frame_alloc();
+            av_frame_ref(finalFrame, rgbaFrame);
+            finalFrame->pts = frame->pts;
 
-        // 将帧以 YUV420P 格式写入文件
-        for (int i = 0; i < frame->height; i++) {
-            fwrite(frame->data[0] + i * frame->linesize[0], 1, frame->width, output);
-        }
-        for (int i = 0; i < frame->height / 2; i++) {
-            fwrite(frame->data[1] + i * frame->linesize[1], 1, frame->width / 2, output);
-        }
-        for (int i = 0; i < frame->height / 2; i++) {
-            fwrite(frame->data[2] + i * frame->linesize[2], 1, frame->width / 2, output);
+            LOGD("🎨 Frame %p added to frameQueue", finalFrame);
+            frameQueue->push(finalFrame);
         }
     }
 
-    // 释放资源
-    fclose(output);
+    LOGI("🛑 Decoder thread finished");
+
+    // 资源释放
+    sws_freeContext(swsCtx);
+    av_free(buffer);
     av_frame_free(&frame);
-    avcodec_free_context(&codec_context);
-    LOGI("Decoding process completed");  // 解码过程完成的信息日志
-}    
+    av_frame_free(&rgbaFrame);
+    avcodec_free_context(&codecCtx);
+    frameQueue->setFinished(true);
+}

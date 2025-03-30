@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.widget.Button;
@@ -56,11 +57,15 @@ public class MainActivity extends AppCompatActivity {
         };
 
         player = new Player();
-        player.setDataSource("file:/sdcard/test12.mp4");
+        player.setDataSource("file:/sdcard/testfile.mp4");
 
         ((SurfaceView) findViewById(R.id.surfaceView)).getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override
             public void surfaceCreated(@NonNull SurfaceHolder holder) {
+                if (holder.getSurface() == null) {
+                    Log.e("mainActivity", "❌ Surface is null, cannot render");
+                    return;
+                }
                 player.setSurface(holder.getSurface());
             }
 

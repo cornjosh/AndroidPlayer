@@ -1,83 +1,71 @@
 // demuxer.cpp
-#include <iostream>
-#include <thread>
-#include "queue.h"
 #include "log.h"
-
-#define LOG_TAG "Demuxer"  // 定义日志标签
-
+#define TAG "demuxer"
+#include "packetQueue.h"
 
 extern "C" {
 #include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
 }
 
+#include <thread>
 
-// 解封装函数，将输入文件解封装为视频数据包并放入队列
-void demux() {
-    LOGI("Starting demuxing process");
+void demuxThread(const char* inputPath, PacketQueue* queue, int* videoStreamIndexOut) {
+    AVFormatContext *formatCtx = nullptr;
 
-    AVFormatContext* format_context = nullptr;
-    int ret = avformat_open_input(&format_context, input_file, nullptr, nullptr);
-    if (ret < 0) {
-        LOGE("Failed to open input file: %s", input_file);
-        return;
-    }
-    LOGV("Successfully opened input file");
-
-    ret = avformat_find_stream_info(format_context, nullptr);
-    if (ret < 0) {
-        LOGE("Failed to find stream information");
-        avformat_close_input(&format_context);
+    LOGI("📂 Opening input: %s", inputPath);
+    if (avformat_open_input(&formatCtx, inputPath, nullptr, nullptr) != 0) {
+        LOGE("❌ Failed to open input: %s", inputPath);
         return;
     }
 
-    // 查找视频流
-    for (unsigned int i = 0; i < format_context->nb_streams; i++) {
-        if (format_context->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-            video_stream_index = i;
-            codec_par = format_context->streams[i]->codecpar;
-            codec = avcodec_find_decoder(codec_par->codec_id);
-            if (!codec) {
-                LOGE("Failed to find decoder for codec: %s",
-                     avcodec_get_name(codec_par->codec_id));
-                break;
-            }
-            LOGV("Found decoder: %s", codec->name);
+    LOGI("🔍 Finding stream info...");
+    if (avformat_find_stream_info(formatCtx, nullptr) < 0) {
+        LOGE("❌ Failed to find stream info");
+        avformat_close_input(&formatCtx);
+        return;
+    }
+
+    int videoStreamIndex = -1;
+    for (unsigned int i = 0; i < formatCtx->nb_streams; i++) {
+        if (formatCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+            videoStreamIndex = static_cast<int>(i);
             break;
         }
     }
 
-    if (video_stream_index == -1 || !codec) {
-        LOGE("No valid video stream found");
-        avformat_close_input(&format_context);
+    if (videoStreamIndex == -1) {
+        LOGE("❌ No video stream found");
+        avformat_close_input(&formatCtx);
         return;
     }
 
-    // 读取数据包并放入队列
-    AVPacket* packet = av_packet_alloc();
-    while ((ret = av_read_frame(format_context, packet)) >= 0) {
-        if (packet->stream_index == video_stream_index) {
-            AVPacket* new_packet = av_packet_clone(packet);
-            if (new_packet) {
-                packet_queue.put(new_packet);
-                LOGV("Packet added to queue (size=%d)", new_packet->size);
-            }
+    *videoStreamIndexOut = videoStreamIndex;
+    LOGI("🎥 Video stream index: %d", videoStreamIndex);
+
+    AVPacket *packet = av_packet_alloc();
+
+    while (av_read_frame(formatCtx, packet) >= 0) {
+        if (packet->stream_index == videoStreamIndex) {
+            AVPacket *new_packet = av_packet_alloc();
+            av_packet_ref(new_packet, packet);
+            LOGD("📦 Packet %p added to queue: time=%.3f pts=%lld dts=%lld duration=%lld size=%d",
+                 new_packet,
+                 packet->pts * av_q2d(formatCtx->streams[videoStreamIndex]->time_base),
+                 new_packet->pts,
+                 new_packet->dts,
+                 new_packet->duration,
+                 new_packet->size
+            );
+            queue->push(new_packet);
         }
         av_packet_unref(packet);
     }
 
-    if (ret != AVERROR_EOF) {
-        LOGE("Error reading packets: %s", av_err2str(ret));
-    }
-
+    LOGI("🛑 Reached end of file. Cleaning up.");
     av_packet_free(&packet);
-    avformat_close_input(&format_context);
-    LOGI("Demuxing process completed");
+    avformat_close_input(&formatCtx);
+    queue->setFinished(true);
 
-    // 通知解码线程初始化完成
-    {
-        std::lock_guard<std::mutex> lock(init_mutex);
-        init_complete = true;
-    }
-    init_cond.notify_one();
+    LOGI("✅ Demuxing thread finished");
 }

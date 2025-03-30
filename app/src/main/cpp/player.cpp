@@ -1,71 +1,112 @@
 #include <jni.h>
 #include <string>
-#include <stdio.h>
 #include <thread>
-#include <android/native_window_jni.h>
+#include "log.h"
+#define TAG "player"
+#include "packetQueue.h"
+#include "frameQueue.h"
 
 extern "C" {
 #include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
+#include <android/native_window_jni.h>
 }
-#include "frame_queue.h"
-
-// 声明 renderer 线程入口函数（在 renderer.cpp 中实现）
-extern "C" void* renderThread(void* arg);
 
 //
 // Created by zylnt on 2025/3/30.
 //
 
-FrameQueue* g_frameQueue = nullptr;
+// 全局资源
+static PacketQueue* packetQueue = nullptr;
+static FrameQueue* frameQueue = nullptr;
+static AVFormatContext* formatCtx = nullptr;
+static int videoStreamIndex = -1;
+static AVRational videoTimeBase;
+static ANativeWindow* nativeWindow = nullptr;
+static std::string videoPath;
 
-struct RenderContext {
-    ANativeWindow* window;
-    FrameQueue* frameQueue;
-};
+// 线程句柄
+static std::thread demuxerThread;
+static std::thread decoderThread;
+static std::thread rendererThread;
 
-const char* input_file = nullptr;
-const char* output_file = nullptr;
-void decode();
-void demux();
+extern void demuxThread(const char* path, PacketQueue* queue, int* streamIndexOut);
+extern void decodeThread(PacketQueue* packetQueue, FrameQueue* frameQueue, AVCodecParameters* codecpar);
+extern void renderThread(FrameQueue* frameQueue, ANativeWindow* window, AVRational time_base);
+
 
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_example_androidplayer_Player_nativePlay(JNIEnv *env, jobject thiz, jstring file,
                                                  jobject surface) {
-    const char* filePath = env->GetStringUTFChars(file, nullptr);
+    // 处理文件路径
+    const char* src = env->GetStringUTFChars(file, nullptr);
+    videoPath = src;
+    env->ReleaseStringUTFChars(file, src);
+    LOGI("📁 nativeSetDataSource: %s", videoPath.c_str());
 
-    // 初始化全局帧队列（如果还未创建）
-    if (!g_frameQueue) {
-        g_frameQueue = new FrameQueue();
+    // 设置 surface
+    if (nativeWindow) {
+        ANativeWindow_release(nativeWindow);
+        nativeWindow = nullptr;
     }
 
-    // 从 Java Surface 获取 ANativeWindow，用于 EGL 渲染
-    ANativeWindow* nativeWindow = ANativeWindow_fromSurface(env, surface);
+    nativeWindow = ANativeWindow_fromSurface(env, surface);
+    if (!nativeWindow) {
+        LOGE("❌ ANativeWindow_fromSurface failed! surface is null.");
+        return -1;
+    }
 
-    // 启动渲染线程，将 nativeWindow 与帧队列传递给它
-    RenderContext renderCtx;
-    renderCtx.window = nativeWindow;
-    renderCtx.frameQueue = g_frameQueue;
-    std::thread render_thread(renderThread, &renderCtx);
+    LOGI("✅ nativeSetSurface success: window=%p", nativeWindow);
 
-    std::string filesDir = "/storage/emulated/0";
-    std::string inputFilePath = filesDir + "/testfile.mp4";
-    std::string outputFilePath = filesDir + "/output.yuv";
-    input_file = inputFilePath.c_str();
-    output_file = outputFilePath.c_str();
+    LOGI("▶️ nativeStart");
 
-    std::thread demux_thread(demux);
-    std::thread decode_thread(decode);
-    demux_thread.join();
-    decode_thread.join();
-    render_thread.join();
+    // 初始化全局状态
+//    av_register_all();
+    avformat_network_init();
+
+    packetQueue = new PacketQueue();
+    frameQueue = new FrameQueue();
+
+    // 打开视频获取 AVFormatContext
+    if (avformat_open_input(&formatCtx, videoPath.c_str(), nullptr, nullptr) != 0) {
+        LOGE("❌ Failed to open input file.");
+        return -1;
+    }
+
+    if (avformat_find_stream_info(formatCtx, nullptr) < 0) {
+        LOGE("❌ Failed to find stream info.");
+        return -2;
+    }
+
+    // 找到视频流索引
+    for (unsigned int i = 0; i < formatCtx->nb_streams; i++) {
+        if (formatCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+            videoStreamIndex = i;
+            videoTimeBase = formatCtx->streams[i]->time_base;
+            break;
+        }
+    }
+
+    if (videoStreamIndex == -1) {
+        LOGE("❌ No video stream found.");
+        return -3;
+    }
+
+    LOGI("📦 Starting demux/decode/render threads...");
+
+    demuxerThread = std::thread(demuxThread, videoPath.c_str(), packetQueue, &videoStreamIndex);
+    decoderThread = std::thread(decodeThread, packetQueue, frameQueue,
+                                formatCtx->streams[videoStreamIndex]->codecpar);
+    rendererThread = std::thread(renderThread, frameQueue, nativeWindow, videoTimeBase);
+
+    // 可选：detach 或 join 管理线程生命周期
+    demuxerThread.detach();
+    decoderThread.detach();
+    rendererThread.detach();
+
     return 0;
 }
 
-void init_renderer(JNIEnv *pEnv, jobject pJobject) {
-
-}
 
 
 extern "C"

@@ -43,25 +43,25 @@ set_target_properties(ffmpeg PROPERTIES IMPORTED_LOCATION ${ffmpeg_lib_dir}/libf
 
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
-        AAudioRender.cpp
-        ANWRender.cpp
-#        queue.cpp
-#        demuxer.cpp
-#        decoder.cpp
+#        ANWRender.cpp
+#        AAudioRender.cpp
         player.cpp
+        demuxer.cpp
+        decoder.cpp
         renderer.cpp
-        main.cpp
+        packetQueue.cpp
+        frameQueue.cpp
 )
 
-#find_library(GLESv2_LIB GLESv2)
-#find_library(EGL_LIB EGL)
+find_library(GLESv2_LIB GLESv2)
+find_library(EGL_LIB EGL)
 # Specifies libraries CMake should link to your target library. You
 # can link libraries from various origins, such as libraries defined in this
 # build script, prebuilt third-party libraries, or Android system libraries.
 target_link_libraries(${CMAKE_PROJECT_NAME}
         # List libraries link to the target library
-#        ${GLESv2_LIB}
-#        ${EGL_LIB}
+        ${GLESv2_LIB}
+        ${EGL_LIB}
         android
         ffmpeg
         log
