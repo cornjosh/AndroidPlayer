@@ -53,15 +53,15 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         main.cpp
 )
 
-find_library(GLESv2_LIB GLESv2)
-find_library(EGL_LIB EGL)
+#find_library(GLESv2_LIB GLESv2)
+#find_library(EGL_LIB EGL)
 # Specifies libraries CMake should link to your target library. You
 # can link libraries from various origins, such as libraries defined in this
 # build script, prebuilt third-party libraries, or Android system libraries.
 target_link_libraries(${CMAKE_PROJECT_NAME}
         # List libraries link to the target library
-        ${GLESv2_LIB}
-        ${EGL_LIB}
+#        ${GLESv2_LIB}
+#        ${EGL_LIB}
         android
         ffmpeg
         log
