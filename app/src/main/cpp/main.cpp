@@ -13,23 +13,6 @@
 
 #define LOG_TAG "Main"
 
-// 获取应用的内部存储目录
-std::string getFilesDir(JNIEnv* env, jobject context) {
-    jclass contextClass = env->GetObjectClass(context);
-    jmethodID getFilesDirMethod = env->GetMethodID(contextClass, "getFilesDir", "()Ljava/io/File;");
-    jobject fileObject = env->CallObjectMethod(context, getFilesDirMethod);
-
-    jclass fileClass = env->GetObjectClass(fileObject);
-    jmethodID getPathMethod = env->GetMethodID(fileClass, "getPath", "()Ljava/lang/String;");
-    jstring pathString = (jstring)env->CallObjectMethod(fileObject, getPathMethod);
-
-    const char* path = env->GetStringUTFChars(pathString, nullptr);
-    std::string result(path);
-    env->ReleaseStringUTFChars(pathString, path);
-
-    return result;
-}
-
 
 extern "C"
 JNIEXPORT void JNICALL

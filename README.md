@@ -16,6 +16,7 @@
 ## 作业要求
 
 - 交叉编译 FFmpeg 静态库，并打包成一个动态库 `libffmpeg.so`，并且可以在 Android 上运行
+- 创建 `log.h` 文件，实现 `LOGE`、`LOGI` 等日志打印宏
 - 创建 `queue.h` 和 `queue.cpp` 文件，实现一个线程安全的队列
 - 创建 `demuxer.cpp` 文件，实现 `demux` 线程，对原视频进行解封装，得到 `video packet`
 - 得到的 `video packet` 需要放入到 `queue` 中
