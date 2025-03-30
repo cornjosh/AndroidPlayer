@@ -108,6 +108,9 @@ void decodeThread(PacketQueue* packetQueue, FrameQueue* frameQueue, AVCodecParam
             }
 
             rgbaFrame->pts = frame->pts;
+            rgbaFrame->pts = frame->pts;
+            rgbaFrame->pkt_dts = frame->pkt_dts;
+            rgbaFrame->repeat_pict = frame->repeat_pict;
 
             LOGD("🎨 RGBA frame %p pushed to queue: size=%dx%d  linesize=%d",
                  rgbaFrame, rgbaFrame->width, rgbaFrame->height, rgbaFrame->linesize[0]);
