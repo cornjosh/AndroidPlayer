@@ -5,10 +5,14 @@
 
 #include "frameQueue.h"
 
+#include <mutex>
+
 extern "C" {
 #include <libavutil/frame.h>
 #include <android/native_window_jni.h>
 }
+
+std::mutex renderInitMutex;
 
 static const char* vertexShaderCode = R"(
 attribute vec4 aPosition;
@@ -47,6 +51,13 @@ GLuint createProgram(const char* vertexSrc, const char* fragmentSrc) {
 }
 
 void initRenderContext(RenderContext* ctx, ANativeWindow* window, int width, int height) {
+    std::lock_guard<std::mutex> lock(renderInitMutex);
+
+    if (ctx->initialized && ctx->window == window) {
+        LOGI("🛡️ Already initialized with same surface, skipping");
+        return;
+    }
+
     ctx->window = window;
     ctx->width = width;
     ctx->height = height;
@@ -119,10 +130,12 @@ void initRenderContext(RenderContext* ctx, ANativeWindow* window, int width, int
 
 void renderFrameToSurface(AVFrame* frame, ANativeWindow* window) {
     static RenderContext ctx;
-    if (!ctx.initialized) {
+    if (!ctx.initialized || ctx.window != window) {
+        LOGI("⚠️ EGL context not initialized or surface changed, reinitializing...");
         initRenderContext(&ctx, window, frame->width, frame->height);
-        LOGI("🖼️ EGL initialized with size: %dx%d", frame->width, frame->height);
     }
+
+    LOGD("🖼️ Frame size: %dx%d  linesize=%d", frame->width, frame->height, frame->linesize[0]);
 
     glViewport(0, 0, ctx.width, ctx.height);
     glUseProgram(ctx.program);
@@ -142,6 +155,10 @@ void renderFrameToSurface(AVFrame* frame, ANativeWindow* window) {
     glBindTexture(GL_TEXTURE_2D, ctx.texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame->width, frame->height,
                  0, GL_RGBA, GL_UNSIGNED_BYTE, frame->data[0]);
+    GLenum err = glGetError();
+    if (err != GL_NO_ERROR) {
+        LOGE("❌ glTexImage2D error: 0x%x", err);
+    }
 
     glUniform1i(ctx.samplerLoc, 0);
 
@@ -149,8 +166,16 @@ void renderFrameToSurface(AVFrame* frame, ANativeWindow* window) {
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    GLenum err2 = glGetError();
+    if (err2 != GL_NO_ERROR) {
+        LOGE("❌ glDrawArrays error: 0x%x", err2);
+    }
 
     eglSwapBuffers(ctx.display, ctx.surface);
+    EGLint swapErr = eglGetError();
+    if (swapErr != EGL_SUCCESS) {
+        LOGE("❌ eglSwapBuffers failed: 0x%x", swapErr);
+    }
 }
 
 void renderThread(FrameQueue* frameQueue, ANativeWindow* window, AVRational time_base) {
