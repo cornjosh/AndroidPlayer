@@ -88,9 +88,11 @@ void decodeThread(PacketQueue* packetQueue, FrameQueue* frameQueue, AVCodecParam
 
             AVFrame* finalFrame = av_frame_alloc();
             av_frame_ref(finalFrame, rgbaFrame);
+            finalFrame->height = frame->height;
+            finalFrame->width = frame->width;
             finalFrame->pts = frame->pts;
 
-            LOGD("🎨 Frame %p added to frameQueue", finalFrame);
+            LOGD("🎨 Frame %p added to frameQueue, size: %dx%d", finalFrame, finalFrame->height, finalFrame->width);
             frameQueue->push(finalFrame);
         }
     }

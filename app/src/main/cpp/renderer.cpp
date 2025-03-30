@@ -51,6 +51,13 @@ void initRenderContext(RenderContext* ctx, ANativeWindow* window, int width, int
     ctx->width = width;
     ctx->height = height;
 
+    if (ctx->width <= 0 || ctx->height <= 0) {
+        LOGE("❌ EGL window size invalid: %dx%d", ctx->width, ctx->height);
+        return;
+    }
+
+    LOGI("✅ EGL initialized with size: %dx%d", ctx->width, ctx->height);
+
     ctx->display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     eglInitialize(ctx->display, nullptr, nullptr);
 

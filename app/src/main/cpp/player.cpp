@@ -99,9 +99,9 @@ Java_com_example_androidplayer_Player_nativePlay(JNIEnv *env, jobject thiz, jstr
     rendererThread = std::thread(renderThread, frameQueue, nativeWindow, videoTimeBase);
 
     // 可选：detach 或 join 管理线程生命周期
-    demuxerThread.join();
-    decoderThread.join();
-    rendererThread.join();
+    demuxerThread.detach();
+    decoderThread.detach();
+    rendererThread.detach();
 
     return 0;
 }
