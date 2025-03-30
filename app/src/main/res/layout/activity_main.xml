@@ -35,7 +35,8 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
-        tools:layout_editor_absoluteY="45dp" />
+        tools:layout_editor_absoluteY="45dp"
+        tools:ignore="MissingConstraints" />
 
     <SeekBar
         android:id="@+id/seekBar"
