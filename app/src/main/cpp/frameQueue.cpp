@@ -46,3 +46,8 @@ bool FrameQueue::isFinished() const {
     std::unique_lock<std::mutex> lock(mtx);
     return finished;
 }
+
+bool FrameQueue::empty() const {
+    std::unique_lock<std::mutex> lock(mtx);
+    return queue.empty();
+}
