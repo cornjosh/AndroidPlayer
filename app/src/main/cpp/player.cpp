@@ -24,6 +24,7 @@ static int videoStreamIndex = -1;
 static AVRational videoTimeBase;
 static ANativeWindow* nativeWindow = nullptr;
 static std::string videoPath;
+static PacketQueue* audioPacketQueue = nullptr;
 
 // 线程句柄
 static std::thread demuxerThread;
