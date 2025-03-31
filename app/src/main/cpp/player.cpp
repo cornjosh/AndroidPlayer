@@ -30,6 +30,7 @@ static std::string videoPath;
 static PacketQueue* audioPacketQueue = nullptr;
 static AudioRingBuffer* audioRingBuffer = new AudioRingBuffer(9600000);
 static Timer timer;
+static bool isInited = false; // 是否初始化完成
 
 // 线程同步变量
 
@@ -54,6 +55,11 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_com_example_androidplayer_Player_nativePlay(JNIEnv *env, jobject thiz, jstring file,
                                                  jobject surface) {
+    if (isInited){
+        timer.resume();
+        return 0;
+    }
+
     // 处理文件路径
     const char* src = env->GetStringUTFChars(file, nullptr);
     videoPath = src;
@@ -139,6 +145,8 @@ Java_com_example_androidplayer_Player_nativePlay(JNIEnv *env, jobject thiz, jstr
     audioDecoderThread.detach();
     aAudioPlayerThread.detach();
 
+    isInited = true;
+
     return 0;
 }
 
@@ -147,7 +155,7 @@ Java_com_example_androidplayer_Player_nativePlay(JNIEnv *env, jobject thiz, jstr
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_example_androidplayer_Player_nativePause(JNIEnv *env, jobject thiz, jboolean p) {
-    // TODO: implement nativePause()
+    timer.pause();
 }
 
 
@@ -162,7 +170,7 @@ Java_com_example_androidplayer_Player_nativeSeek(JNIEnv *env, jobject thiz, jdou
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_example_androidplayer_Player_nativeStop(JNIEnv *env, jobject thiz) {
-    // TODO: implement nativeStop()
+
     return 0;
 }
 
@@ -170,7 +178,7 @@ Java_com_example_androidplayer_Player_nativeStop(JNIEnv *env, jobject thiz) {
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_example_androidplayer_Player_nativeSetSpeed(JNIEnv *env, jobject thiz, jfloat speed) {
-    // TODO: implement nativeSetSpeed()
+    timer.setTimeSpeed(speed);
     return 0;
 }
 
