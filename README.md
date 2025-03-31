@@ -34,7 +34,30 @@
 ## 已实现功能
 
 - [x] 交叉编译 FFmpeg 静态库，并打包成一个动态库 `libffmpeg.so`
-- 
+- [x] 创建 `log.h` 文件，实现 `LOGE`、`LOGI` 等日志打印宏
+- [x] 两个 `packetQueue`，一个 `videoPacketQueue` 和一个 `audioPacketQueue`，分别用于存放 `video packet` 和
+  `audio packet`
+- [x] 一个 `frameQueue`，用于存放 `video frame`
+- [x] 一个 `audioRingBuffer`，用于存放 `audio pcm`
+- [x] 一个 `demux` 线程，对原视频进行解封装，得到 `video packet` 和 `audio packet`，并
+  放入到 `videoPacketQueue` 和 `audioPacketQueue` 中
+- [x] 一个 `decode` 线程，从 `videoPacketQueue` 中获取 `video packet` 进行解码，得到 `video frame`，
+  并放入到 `frameQueue` 中
+- [x] 一个 `audioDecode` 线程，从 `audioPacketQueue` 中获取 `audio packet` 进行解码，得到 `audio pcm`，
+  并放入到 `audioRingBuffer` 中
+- [x] 一个 `renderer` 线程，从 `frameQueue` 中获取 `video frame`，并使用 `OpenGL` 渲染到指定的
+  `SurfaceView` 上
+- [x] 一个 `AAudioPlayer` 线程，从 `audioRingBuffer` 中获取 `audio pcm`，并使用 `AAudio` 播放音频
+- [x] 一个 `Timer` 线程，负责控制总体的播放进度
+- [x] 使用 `Timer` 线程控制 `video` 和 `audio` 的同步播放
+
+### 附加功能
+
+- [x] 使用 `Timer` 实现进度条的显示功能
+- [x] 使用 `Timer` 实现非精确 `seek` 功能
+- [x] 使用 `Timer` 实现倍速播放功能（暂时只能视频倍速）
+- [x] 使用 `Timer` 实现暂停和继续播放功能
+- [x] 使用 `isInit` 实现播放器的初始化和释放功能（优雅的退出）
 
 
 
