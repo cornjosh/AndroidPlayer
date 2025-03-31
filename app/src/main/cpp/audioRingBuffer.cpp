@@ -4,6 +4,8 @@
 //
 
 #include "audioRingBuffer.h"
+#include "log.h"
+#define TAG "AudioRingBuffer"
 #include <cstring>
 #include <algorithm>
 
@@ -24,6 +26,7 @@ void AudioRingBuffer::write(const uint8_t* data, size_t len) {
         size++;
     }
     cond.notify_all();
+    LOGD("💾 Written to ringBuffer, size=%zu, current size=%zu", len, size);
 }
 
 size_t AudioRingBuffer::read(uint8_t* out, size_t len) {
@@ -36,9 +39,11 @@ size_t AudioRingBuffer::read(uint8_t* out, size_t len) {
         readPos = (readPos + 1) % capacity;
         size--;
     }
+    LOGD("🎵 Read %zu bytes from ringBuffer, current size=%zu", toRead, size);
 
     return toRead;
 }
+
 
 void AudioRingBuffer::clear() {
     std::lock_guard<std::mutex> lock(mutex);

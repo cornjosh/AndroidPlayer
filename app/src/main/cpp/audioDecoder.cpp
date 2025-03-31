@@ -94,8 +94,9 @@ void audioDecodeThread(PacketQueue* packetQueue, AudioRingBuffer* ringBuffer, AV
             int outSize = outSamples * av_get_bytes_per_sample(AV_SAMPLE_FMT_S16) * codecCtx->ch_layout.nb_channels;
             LOGD("🎵 Converted PCM: samples=%d, outSize=%d, pts=%.3f sec", outSamples, outSize, pts_seconds);
 
+            // 写入环形缓冲区
             ringBuffer->write(outBuffer, outSize);
-            LOGD("💾 PCM written to ringBuffer");
+            LOGD("💾 PCM written to ringBuffer, size=%d", outSize);
         }
 
     }

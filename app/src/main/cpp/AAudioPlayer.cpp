@@ -54,58 +54,53 @@ void AAudioPlayerThread(AudioRingBuffer* ringBuffer) {
 
     LOGI("✅ AAudio stream successfully opened");
 
-//    const size_t bufferSize = 192000; // 每次读取的最大字节数
-//    uint8_t buffer[bufferSize];
+    AAudioStream_requestStart(stream);
 
-//    while (true) {
-//        // 从环形缓冲区读取数据
-//        size_t dataRead = ringBuffer->read(buffer, bufferSize);
+    const int bufferSize = 2048;
+    uint8_t buffer[bufferSize];
+
+    while (true) {
+        size_t bytesRead = ringBuffer->read(buffer, bufferSize);
+        if (bytesRead > 0) {
+            int framesToWrite = bytesRead / (2 * sizeof(int16_t)); // stereo, 16-bit
+            AAudioStream_write(stream, buffer, framesToWrite, 100000000);
+        } else {
+            if (ringBuffer->isFinished() && ringBuffer->isEmpty()) {
+                LOGI("🎉 Audio ring buffer fully played!");
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+    }
+
+
+
+//      简单的纯音频数据：正弦波生成（440Hz）
+//    const int sampleRate = 44100;
+//    const int frequency = 440;  // A4
+//    const int seconds = 5;
+//    const int totalFrames = sampleRate * seconds;
+//    int16_t* buffer = new int16_t[totalFrames * 2];  // stereo
 //
-//        if (dataRead == 0) {
-//            LOGD("🔄 Ring buffer is empty, sleeping...");
-//            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-//            continue;
-//        }
-//
-//        if (dataRead > 0) {
-//            LOGD("🎵 Read %zu bytes of audio data from ringBuffer", dataRead);
-//            // 确保流没有关闭
-//            if (stream != nullptr) {
-//                AAudioStream_write(stream, buffer, dataRead, 0);
-//            } else {
-//                LOGE("❌ AAudio stream is nullptr");
-//                break;
-//            }
-//        }
+//    for (int i = 0; i < totalFrames; ++i) {
+//        float sample = 32767 * sinf(2.0f * M_PI * frequency * i / sampleRate);
+//        buffer[2 * i] = (int16_t) sample;       // left
+//        buffer[2 * i + 1] = (int16_t) sample;   // right
 //    }
-
-
-
-     // 简单的纯音频数据：正弦波生成（440Hz）
-    const int sampleRate = 44100;
-    const int frequency = 440;  // A4
-    const int seconds = 5;
-    const int totalFrames = sampleRate * seconds;
-    int16_t* buffer = new int16_t[totalFrames * 2];  // stereo
-
-    for (int i = 0; i < totalFrames; ++i) {
-        float sample = 32767 * sinf(2.0f * M_PI * frequency * i / sampleRate);
-        buffer[2 * i] = (int16_t) sample;       // left
-        buffer[2 * i + 1] = (int16_t) sample;   // right
-    }
-
-    // 🔥 写入帧数（不是字节数）
-    result = AAudioStream_write(stream, buffer, totalFrames, 100000000L); // 100ms timeout
-    if (result < 0) {
-        LOGE("❌ Failed to write to AAudio stream: %s", AAudio_convertResultToText(result));
-    } else {
-        LOGI("✅ Successfully wrote %d frames to stream", result);
-    }
-    std::this_thread::sleep_for(std::chrono::seconds(seconds));
+//
+//    // 🔥 写入帧数（不是字节数）
+//    result = AAudioStream_write(stream, buffer, totalFrames, 100000000L); // 100ms timeout
+//    if (result < 0) {
+//        LOGE("❌ Failed to write to AAudio stream: %s", AAudio_convertResultToText(result));
+//    } else {
+//        LOGI("✅ Successfully wrote %d frames to stream", result);
+//    }
+//    std::this_thread::sleep_for(std::chrono::seconds(seconds));
 
 
     // 关闭流
     LOGI("🛑 Closing AAudio stream");
+    AAudioStream_requestStop(stream);
     AAudioStream_close(stream);
     LOGI("✅ AAudio stream closed");
 }

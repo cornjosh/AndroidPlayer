@@ -12,7 +12,7 @@
 
 class AudioRingBuffer {
 public:
-    AudioRingBuffer(size_t capacity = 960000); // ~5秒音频
+    AudioRingBuffer(size_t capacity = 96000000000); // ~5秒音频
     ~AudioRingBuffer();
 
     void write(const uint8_t* data, size_t len);
