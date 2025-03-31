@@ -10,6 +10,8 @@
 #define TAG "player"
 #include "packetQueue.h"
 #include "frameQueue.h"
+#include "AAudioRender.h"
+#include "audioRingBuffer.h"
 
 extern "C" {
 #include <libavformat/avformat.h>
@@ -26,16 +28,20 @@ static AVRational videoTimeBase;
 static ANativeWindow* nativeWindow = nullptr;
 static std::string videoPath;
 static PacketQueue* audioPacketQueue = nullptr;
+static AudioRingBuffer* audioRingBuffer = new AudioRingBuffer(96000); // ~0.5秒音频
 
 
 // 线程句柄
 static std::thread demuxerThread;
 static std::thread decoderThread;
 static std::thread rendererThread;
+static std::thread audioDecoderThread;
 
 extern void demuxThread(const char* path, PacketQueue* videoQueue, PacketQueue* audioQueue, int videoStreamIndex, int audioStreamIndex);
 extern void decodeThread(PacketQueue* packetQueue, FrameQueue* frameQueue, AVCodecParameters* codecpar);
 extern void renderThread(FrameQueue* frameQueue, ANativeWindow* window, AVRational time_base);
+extern int aaudio_data_callback(AAudioStream* stream, void* userData, void* audioData, int32_t numFrames);
+extern void audioDecodeThread(PacketQueue* packetQueue, AudioRingBuffer* ringBuffer, AVCodecParameters* codecpar);
 
 
 extern "C"
@@ -111,11 +117,23 @@ Java_com_example_androidplayer_Player_nativePlay(JNIEnv *env, jobject thiz, jstr
     decoderThread = std::thread(decodeThread, packetQueue, frameQueue,
                                 formatCtx->streams[videoStreamIndex]->codecpar);
     rendererThread = std::thread(renderThread, frameQueue, nativeWindow, videoTimeBase);
+    audioDecoderThread = std::thread(audioDecodeThread, audioPacketQueue, audioRingBuffer,
+                                formatCtx->streams[audioStreamIndex]->codecpar);
+
 
     // 可选：detach 或 join 管理线程生命周期
     demuxerThread.detach();
     decoderThread.detach();
     rendererThread.detach();
+    audioDecoderThread.detach();
+
+    auto* audioRender = new AAudioRender();
+    audioRender->configure(44100, 2, AAUDIO_FORMAT_PCM_I16);
+    audioRender->setCallback(aaudio_data_callback, audioRingBuffer);
+
+    if (audioRender->start() != 0) {
+        LOGE("❌ Failed to start AAudioRender");
+    }
 
     return 0;
 }
