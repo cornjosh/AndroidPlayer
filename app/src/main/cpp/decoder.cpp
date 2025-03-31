@@ -12,6 +12,7 @@ extern "C" {
 }
 
 #include <thread>
+#include "timer.h"
 
 void decodeThread(PacketQueue* packetQueue, FrameQueue* frameQueue, AVCodecParameters* codecpar) {
     LOGI("🔧 Starting decoder thread");
@@ -77,6 +78,9 @@ void decodeThread(PacketQueue* packetQueue, FrameQueue* frameQueue, AVCodecParam
         }
 
         while (ret >= 0) {
+            if (!Timer::isPlaying){
+                return;
+            }
             ret = avcodec_receive_frame(codecCtx, frame);
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
             else if (ret < 0) {

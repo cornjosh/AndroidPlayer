@@ -9,6 +9,7 @@ extern "C" {
 }
 
 #include <thread>
+#include "timer.h"
 
 void demuxThread(const char* inputPath, PacketQueue* videoQueue, PacketQueue *audioQueue, int videoStreamIndex, int audioStreamIndex) {
     AVFormatContext *formatCtx = nullptr;
@@ -29,6 +30,9 @@ void demuxThread(const char* inputPath, PacketQueue* videoQueue, PacketQueue *au
     AVPacket *packet = av_packet_alloc();
 
     while (av_read_frame(formatCtx, packet) >= 0) {
+        if (!Timer::isPlaying){
+            return;
+        }
         if (packet->stream_index == videoStreamIndex) {
             AVPacket *new_packet = av_packet_alloc();
             av_packet_ref(new_packet, packet);

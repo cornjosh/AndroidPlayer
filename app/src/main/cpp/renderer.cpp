@@ -180,6 +180,9 @@ void renderFrameToSurface(AVFrame* frame, ANativeWindow* window) {
 }
 
 void renderThread(FrameQueue* frameQueue, ANativeWindow* window, AVRational time_base) {
+    if (!Timer::isPlaying){
+        return;
+    }
     while (!(frameQueue->isFinished() && frameQueue->empty())) {
         AVFrame* frame = frameQueue->pop();
         if (!frame) continue;

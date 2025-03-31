@@ -57,6 +57,7 @@ Java_com_example_androidplayer_Player_nativePlay(JNIEnv *env, jobject thiz, jstr
         timer.resume();
         return 0;
     }
+    Timer::isPlaying = true; // 设置为正在播放
 
     // 处理文件路径
     const char* src = env->GetStringUTFChars(file, nullptr);
@@ -169,11 +170,12 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_com_example_androidplayer_Player_nativeStop(JNIEnv *env, jobject thiz) {
     LOGI("🛑 nativeStop called");
-    isPlaying = false;
+//    isPlaying = false;
 
     // 停止主时钟
     timer.pause();
     timer.setCurrentTime(0);
+    Timer::isPlaying = false;
 
     // 释放 native window
     if (nativeWindow) {

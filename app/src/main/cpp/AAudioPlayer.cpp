@@ -66,6 +66,9 @@ void AAudioPlayerThread(AudioRingBuffer* ringBuffer) {
     uint8_t buffer[bufferSize];
 
     while (true) {
+        if (!Timer::isPlaying){
+            return;
+        }
         size_t bytesRead = ringBuffer->read(buffer, bufferSize);
         if (bytesRead > 0) {
             int framesToWrite = bytesRead / (2 * sizeof(int16_t)); // stereo, 16-bit

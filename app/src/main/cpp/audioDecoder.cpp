@@ -7,6 +7,7 @@
 #define TAG "audioDecoder"
 #include "packetQueue.h"
 #include "audioRingBuffer.h"
+#include "timer.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -65,6 +66,9 @@ void audioDecodeThread(PacketQueue* packetQueue, AudioRingBuffer* ringBuffer, AV
     uint8_t* outBuffer = (uint8_t*) av_malloc(192000);  // 最大缓冲
 
     while (!(packetQueue->isFinished() && packetQueue->empty())) {
+        if (!Timer::isPlaying){
+            return;
+        }
         pkt = packetQueue->pop();
         if (!pkt) continue;
 
