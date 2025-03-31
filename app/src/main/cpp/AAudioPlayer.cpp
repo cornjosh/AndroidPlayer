@@ -70,30 +70,37 @@ void AAudioPlayerThread(AudioRingBuffer* ringBuffer) {
         if (bytesRead > 0) {
             int framesToWrite = bytesRead / (2 * sizeof(int16_t)); // stereo, 16-bit
 
-            // 获取当前音频的PTS（播放时间）
+            // 倍速播放
+            double speed = 1.0; // 播放倍速
+
+            double time_sec = getAudioClock(stream);
+            double master_time = Timer::getCurrentTime(); // 主时钟 ⏱️
+            double delay = time_sec - master_time;
+
+            // 打印调试时间戳
+            LOGD("🖼️ Audio Player Time=%.3f, Clock=%.3f, Delay=%.3f",
+                 time_sec, master_time, delay);
+
+            if (delay > 0.02 && delay < 0.2) {
+                // 如果时间还没到，睡一小会儿等它到点再播放
+                speed = 0.5; // 播放倍速
+            } else if (delay < -0.1) {
+                // 太迟了，说明滞后了，丢掉这个帧（如果你愿意）
+                speed = 2.0; // 播放倍速
+            } else if (delay > 0.2) {
+                // 如果时间还没到，睡一小会儿等它到点再播放
+                std::this_thread::sleep_for(std::chrono::milliseconds((int)(delay * 1000 * 2))); // 加倍延迟
+            }
+
+
+            double frameDuration = 1.0 / 44100.0; // 每帧时间（秒）
+            double baseDelay = frameDuration * framesToWrite; // 基准延迟（秒）
+            double actualDelay = baseDelay / speed; // 根据倍速调整延迟
+
+            AAudioStream_write(stream, buffer, framesToWrite, actualDelay * 1e9);
+            // 计算当前音频PTS
             double audioPts = getAudioClock(stream);
-            // 获取主时钟的当前时间
-            double masterClock = Timer::getCurrentTime();
-
-            // 计算音频与主时钟的时间差
-            double timeToSync = audioPts - masterClock;
-
-            // 根据时间差调整播放延迟（单位：微秒）
-            int64_t delayUs = static_cast<int64_t>((framesToWrite / 44100.0) * 1000000.0);
-
-            // 如果音频落后于主时钟，减少延迟（加速播放）
-            if (timeToSync < 0) {
-                delayUs += static_cast<int64_t>(-timeToSync * 1000000);
-            }
-                // 如果音频超前于主时钟，增加延迟（减慢播放）
-            else if (timeToSync > 0) {
-                delayUs -= static_cast<int64_t>(timeToSync * 1000000);
-            }
-
-            // 向音频流写入数据
-            AAudioStream_write(stream, buffer, framesToWrite, delayUs);
-
-            LOGD("🎧 Audio PTS: %.3f sec, Master Clock: %.3f sec, Delay: %ld us", audioPts, masterClock, delayUs);
+            LOGD("🎧 Audio PTS: %.3f sec", audioPts);
         } else {
             if (ringBuffer->isFinished() && ringBuffer->isEmpty()) {
                 LOGI("🎉 Audio ring buffer fully played!");

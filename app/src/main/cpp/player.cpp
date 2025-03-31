@@ -154,7 +154,7 @@ Java_com_example_androidplayer_Player_nativePause(JNIEnv *env, jobject thiz, jbo
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_example_androidplayer_Player_nativeSeek(JNIEnv *env, jobject thiz, jdouble position) {
-    // TODO: implement nativeSeek()
+    timer.setCurrentTime(position);
     return 0;
 }
 
@@ -178,8 +178,7 @@ Java_com_example_androidplayer_Player_nativeSetSpeed(JNIEnv *env, jobject thiz, 
 extern "C"
 JNIEXPORT jdouble JNICALL
 Java_com_example_androidplayer_Player_nativeGetPosition(JNIEnv *env, jobject thiz) {
-    // TODO: implement nativeGetPosition()
-    return 0;
+    return timer.getCurrentTime();
 }
 
 
@@ -187,6 +186,14 @@ Java_com_example_androidplayer_Player_nativeGetPosition(JNIEnv *env, jobject thi
 extern "C"
 JNIEXPORT jdouble JNICALL
 Java_com_example_androidplayer_Player_nativeGetDuration(JNIEnv *env, jobject thiz) {
-    // TODO: implement nativeGetDuration()
-    return 0;
+    if (formatCtx == nullptr) {
+        LOGE("❌ Format context is null, cannot get duration");
+        return -1; // 错误处理：返回 -1 表示无法获取时长
+    }
+
+    // 获取视频时长（单位：微秒），并转换为秒
+    double durationInSeconds = formatCtx->duration / AV_TIME_BASE;
+    LOGI("⏳ Video duration: %.3f seconds", durationInSeconds);
+
+    return durationInSeconds;
 }
