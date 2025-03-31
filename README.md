@@ -19,11 +19,12 @@
 - 创建 `player.cpp` 文件，负责和 Java 层进行交互，并控制三个进程分别进行 `demuxe`,`decode`,`render`
 
 - 创建 `audioPacketQueue`，实现将 `demux` 线程中获取的 `audio packet` 放入到 `audioPacketQueue` 中
-- 创建 `audioDecoder.cpp`，实现 `audioDecode` 线程，对 `audio packet` 进行解码，得到 `audio pcm`
+- 创建 `audioDecoder.cpp`，实现 `audioDecode` 线程，负责对 `audio packet` 进行解码，得到 `audio pcm`
 - 创建 `audioRingBuffer.h` 和 `audioRingBuffer.cpp` 文件，实现一个环形缓冲区，用于存储 `audio pcm`
 - 将解码后的 `audio pcm` 放入到 `audioRingBuffer` 中
 - 在 `player.cpp` 中实现 `audioDecode` 线程，负责和 Java 层进行交互，并控制 `audioDecode` 线程进行解码
-- 在 `player.cpp` 中注册 `AAudioRender` 的回调，在回调中从 `audioRingBuffer` 中获取 `audio pcm`，并渲染到音频设备上
+- 创建 `AAudioPlayer.cpp` 文件，从环形缓冲区中获取 `audio pcm`，并使用 `AAudio` 播放音频
+- 在 `player.cpp` 中实现 `AAudioPlayer` 线程，负责和 Java 层进行交互，并控制 `AAudioPlayer` 线程进行播放
 - 实现 `audio` 和 `video` 的同步
 
 - 附加功能

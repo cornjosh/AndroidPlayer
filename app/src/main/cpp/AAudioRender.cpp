@@ -122,22 +122,25 @@ void AAudioRender::configure(int32_t sampleRate, int32_t channelCnt, aaudio_form
 }
 
 int aaudio_data_callback(AAudioStream* stream, void* userData, void* audioData, int32_t numFrames) {
-    auto* ringBuffer = static_cast<AudioRingBuffer*>(userData);
+    auto* ringBuffer = static_cast<AudioRingBuffer*>(userData); // 获取环形缓冲区实例
     if (!ringBuffer) return AAUDIO_CALLBACK_RESULT_STOP;
 
-    int bytesPerFrame = 2 * sizeof(int16_t);  // stereo + S16
-    int totalBytes = numFrames * bytesPerFrame;
+    int bytesPerFrame = 2 * sizeof(int16_t);  // stereo + S16 格式
+    int totalBytes = numFrames * bytesPerFrame;  // 每帧的字节数
 
+    // 读取音频数据
     int readBytes = ringBuffer->read((uint8_t*)audioData, totalBytes);
 
     if (readBytes < totalBytes) {
-        // Zero out remaining
+        // 如果数据不够，填充剩余部分为零
         memset((uint8_t*)audioData + readBytes, 0, totalBytes - readBytes);
 
-        if (ringBuffer->isFinished() && ringBuffer->isEmpty()) {
-            return AAUDIO_CALLBACK_RESULT_STOP;  // ✅ 告诉 AAudio 停止回调
+        if (ringBuffer->isFinished()) {
+            LOGI("❌ No more audio data to play, stopping callback.");
+            return AAUDIO_CALLBACK_RESULT_STOP;  // 停止回调
         }
     }
 
-    return AAUDIO_CALLBACK_RESULT_CONTINUE;
+    LOGD("🎵 Audio data callback: read %d bytes, %d frames", readBytes, numFrames);
+    return AAUDIO_CALLBACK_RESULT_CONTINUE;  // 继续回调
 }
