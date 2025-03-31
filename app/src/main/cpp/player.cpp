@@ -1,3 +1,8 @@
+//
+// player.cpp
+// Created by zylnt on 2025/3/30.
+//
+
 #include <jni.h>
 #include <string>
 #include <thread>
@@ -10,10 +15,6 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <android/native_window_jni.h>
 }
-
-//
-// Created by zylnt on 2025/3/30.
-//
 
 // 全局资源
 static PacketQueue* packetQueue = nullptr;

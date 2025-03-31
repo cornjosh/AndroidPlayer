@@ -1,3 +1,34 @@
+# Day14
+
+## 作业要求
+
+- 交叉编译 FFmpeg 静态库，并打包成一个动态库 `libffmpeg.so`，并且可以在 Android 上调用
+- 使用 FFmpeg 进行下面的操作
+- 创建 `log.h` 文件，实现 `LOGE`、`LOGI` 等日志打印宏
+- 创建 `packetQueue.h` 和 `packetQueue.cpp` 文件，实现一个线程安全的包队列
+- 创建 `demuxer.cpp` 文件，实现 `demux` 线程，对原视频进行解封装，得到 `video packet`
+- 得到的 `video packet` 需要放入到 `videoPacketQueue` 中
+- 创建 `decoder.cpp` 文件，实现 `decode` 线程，对 `video packet` 进行解码，得到 `video frame`
+- 需要从 `videoPacketQueue` 中获取 `video packet` 进行解码
+- 解码后的 `video frame` 需要以 `RGBA` 格式放入到 `frameQueue` 中
+
+
+- 创建 `frameQueue.h` 和 `frameQueue.cpp` 文件，实现一个线程安全的帧队列
+- 创建 `renderer.cpp` 文件，实现从 `frameQueue` 中获取 `video frame`，并使用 `OpenGL` 渲染到指定的
+  `SurfaceView` 上
+- 创建 `player.cpp` 文件，负责和 Java 层进行交互，并控制三个进程分别进行 `demuxe`,`decode`,`render`
+
+- 创建 `audioPacketQueue`，实现将 `demux` 线程中获取的 `audio packet` 放入到 `audioPacketQueue` 中
+- 创建 `audioDecoder.cpp`，实现 `audioDecode` 线程，对 `audio packet` 进行解码，得到 `audio frame`
+- 调用提供的 `AAudioRender`，实现 `audio frame` 渲染
+- 在 `player.cpp` 中实现 `audio` 渲染线程的控制
+- 实现 `audio` 和 `video` 的同步
+
+- 附加功能
+    - 实现精确 `seek` 和 非精确 `seek` 功能
+    - 实现倍速播放
+
+
 # Day13
 
 ## 作业要求
