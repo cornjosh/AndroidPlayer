@@ -52,6 +52,7 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         packetQueue.cpp
         frameQueue.cpp
         audioRingBuffer.cpp
+        audioDecoder.cpp
 )
 
 find_library(GLESv2_LIB GLESv2)
