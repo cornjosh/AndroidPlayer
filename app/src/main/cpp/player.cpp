@@ -27,7 +27,11 @@ static AVRational videoTimeBase;
 static ANativeWindow* nativeWindow = nullptr;
 static std::string videoPath;
 static PacketQueue* audioPacketQueue = nullptr;
-static AudioRingBuffer* audioRingBuffer = new AudioRingBuffer(9600000); // ~0.5秒音频
+static AudioRingBuffer* audioRingBuffer = new AudioRingBuffer(9600000);
+
+// 线程同步变量
+
+
 
 
 // 线程句柄

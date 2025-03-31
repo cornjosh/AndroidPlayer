@@ -54,6 +54,7 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         audioRingBuffer.cpp
         audioDecoder.cpp
         AAudioPlayer.cpp
+        timer.cpp
 )
 
 find_library(GLESv2_LIB GLESv2)
