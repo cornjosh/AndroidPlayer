@@ -22,9 +22,8 @@
 - 创建 `audioDecoder.cpp`，实现 `audioDecode` 线程，对 `audio packet` 进行解码，得到 `audio pcm`
 - 创建 `audioRingBuffer.h` 和 `audioRingBuffer.cpp` 文件，实现一个环形缓冲区，用于存储 `audio pcm`
 - 将解码后的 `audio pcm` 放入到 `audioRingBuffer` 中
-- 调用提供的 `AAudioRender` 创建 `audioRender` ，读取 `audioRingBuffer` 中的数据，并渲染到音频输出设备上
 - 在 `player.cpp` 中实现 `audioDecode` 线程，负责和 Java 层进行交互，并控制 `audioDecode` 线程进行解码
-- 在 `player.cpp` 中实现 `audioRender` 线程，负责和 Java 层进行交互，并控制 `audioRender` 线程进行渲染
+- 在 `player.cpp` 中注册 `AAudioRender` 的回调，在回调中从 `audioRingBuffer` 中获取 `audio pcm`，并渲染到音频设备上
 - 实现 `audio` 和 `video` 的同步
 
 - 附加功能
