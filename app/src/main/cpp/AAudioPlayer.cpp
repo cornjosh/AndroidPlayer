@@ -2,6 +2,9 @@
 #include "audioRingBuffer.h"
 #include "log.h"
 #define TAG "AAudioPlayer"
+
+double getAudioClock(AAudioStream *pStruct);
+
 #include <thread>
 #include <atomic>
 #include <mutex>
@@ -64,6 +67,9 @@ void AAudioPlayerThread(AudioRingBuffer* ringBuffer) {
         if (bytesRead > 0) {
             int framesToWrite = bytesRead / (2 * sizeof(int16_t)); // stereo, 16-bit
             AAudioStream_write(stream, buffer, framesToWrite, 100000000);
+            // 计算当前音频PTS
+            double audioPts = getAudioClock(stream);
+            LOGD("🎧 Audio PTS: %.3f sec", audioPts);
         } else {
             if (ringBuffer->isFinished() && ringBuffer->isEmpty()) {
                 LOGI("🎉 Audio ring buffer fully played!");
@@ -73,34 +79,21 @@ void AAudioPlayerThread(AudioRingBuffer* ringBuffer) {
         }
     }
 
-
-
-//      简单的纯音频数据：正弦波生成（440Hz）
-//    const int sampleRate = 44100;
-//    const int frequency = 440;  // A4
-//    const int seconds = 5;
-//    const int totalFrames = sampleRate * seconds;
-//    int16_t* buffer = new int16_t[totalFrames * 2];  // stereo
-//
-//    for (int i = 0; i < totalFrames; ++i) {
-//        float sample = 32767 * sinf(2.0f * M_PI * frequency * i / sampleRate);
-//        buffer[2 * i] = (int16_t) sample;       // left
-//        buffer[2 * i + 1] = (int16_t) sample;   // right
-//    }
-//
-//    // 🔥 写入帧数（不是字节数）
-//    result = AAudioStream_write(stream, buffer, totalFrames, 100000000L); // 100ms timeout
-//    if (result < 0) {
-//        LOGE("❌ Failed to write to AAudio stream: %s", AAudio_convertResultToText(result));
-//    } else {
-//        LOGI("✅ Successfully wrote %d frames to stream", result);
-//    }
-//    std::this_thread::sleep_for(std::chrono::seconds(seconds));
-
-
     // 关闭流
     LOGI("🛑 Closing AAudio stream");
     AAudioStream_requestStop(stream);
     AAudioStream_close(stream);
     LOGI("✅ AAudio stream closed");
 }
+
+double getAudioClock(AAudioStream *stream) {
+
+    // 获取已经写入的帧数
+    int64_t frames = AAudioStream_getFramesWritten(stream);
+    int sampleRate = AAudioStream_getSampleRate(stream);
+
+    if (sampleRate <= 0) return 0.0;
+
+    return (double)frames / sampleRate; // 单位：秒
+}
+

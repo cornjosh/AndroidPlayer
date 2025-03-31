@@ -10,7 +10,6 @@
 #define TAG "player"
 #include "packetQueue.h"
 #include "frameQueue.h"
-#include "AAudioRender.h"
 #include "audioRingBuffer.h"
 
 extern "C" {
