@@ -32,8 +32,6 @@ static AudioRingBuffer* audioRingBuffer = new AudioRingBuffer(9600000);
 static Timer timer;
 static bool isInited = false; // 是否初始化完成
 
-// 线程同步变量
-
 
 
 
@@ -132,7 +130,7 @@ Java_com_example_androidplayer_Player_nativePlay(JNIEnv *env, jobject thiz, jstr
                                 formatCtx->streams[audioStreamIndex]->codecpar);
     aAudioPlayerThread = std::thread(AAudioPlayerThread, audioRingBuffer);
 
-    timer.setCurrentTime(-1); // 设置初始时间为 -1，表示未开始播放
+    timer.setCurrentTime(0); // 设置初始时间为 0
     timer.setTimeSpeed(1.0); // 设置时间倍率为 1.0
     timer.start(); // 启动计时器线程
     LOGI("⏱️ Timer started with initial time: %.3f", Timer::getCurrentTime());
@@ -170,7 +168,63 @@ Java_com_example_androidplayer_Player_nativeSeek(JNIEnv *env, jobject thiz, jdou
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_example_androidplayer_Player_nativeStop(JNIEnv *env, jobject thiz) {
+    LOGI("🛑 nativeStop called");
+    isPlaying = false;
 
+    // 停止主时钟
+    timer.pause();
+    timer.setCurrentTime(0);
+
+    // 释放 native window
+    if (nativeWindow) {
+        ANativeWindow_release(nativeWindow);
+        nativeWindow = nullptr;
+        LOGI("🧹 Released ANativeWindow");
+    }
+
+    // 关闭并释放 AVFormatContext
+    if (formatCtx) {
+        avformat_close_input(&formatCtx);  // 自动释放 streams
+        formatCtx = nullptr;
+        LOGI("🧹 Closed AVFormatContext");
+    }
+
+    // 释放 PacketQueue（video）
+    if (packetQueue) {
+        delete packetQueue;
+        packetQueue = nullptr;
+        LOGI("🧹 Deleted video PacketQueue");
+    }
+
+    // 释放 PacketQueue（audio）
+    if (audioPacketQueue) {
+        delete audioPacketQueue;
+        audioPacketQueue = nullptr;
+        LOGI("🧹 Deleted audio PacketQueue");
+    }
+
+    // 释放 FrameQueue
+    if (frameQueue) {
+        delete frameQueue;
+        frameQueue = nullptr;
+        LOGI("🧹 Deleted FrameQueue");
+    }
+
+    // 重建 AudioRingBuffer（或你也可以添加 clear 函数）
+    if (audioRingBuffer) {
+        delete audioRingBuffer;
+        audioRingBuffer = new AudioRingBuffer(9600000);  // 预分配一样大小
+        LOGI("🔄 Reset AudioRingBuffer");
+    }
+
+    // 清空视频路径和流索引
+    videoPath.clear();
+    videoStreamIndex = -1;
+    audioStreamIndex = -1;
+
+    isInited = false;
+
+    LOGI("✅ All playback resources cleaned up");
     return 0;
 }
 

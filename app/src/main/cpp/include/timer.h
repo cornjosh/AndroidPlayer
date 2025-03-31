@@ -36,6 +36,7 @@ private:
     static std::mutex controlMutex;          // 控制暂停/恢复的互斥锁
     static std::condition_variable pauseCond;// 暂停条件变量
     static bool paused;                      // 是否处于暂停状态
+    static bool isPlaying;                  // 是否正在播放
 
     // 非静态成员（每个 Timer 实例自己维护）
     double timeSpeed;             // 时间倍率
