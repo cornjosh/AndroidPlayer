@@ -1,9 +1,10 @@
 // AAudioRender.cpp
 
 #include "AAudioRender.h"
-#include "log.h"
+#include "audioRingBuffer.h"
 
-#define LOG_TAG "AAudioRender"
+#include "log.h"
+#define TAG "AAudioRender"
 
 AAudioRender::AAudioRender() {
     this->paused = false;
@@ -21,7 +22,7 @@ int AAudioRender::start() {
     AAudioStreamBuilder *builder;
     aaudio_result_t result = AAudio_createStreamBuilder(&builder);
     if (result != AAUDIO_OK) {
-        LOGE(LOG_TAG, "createStreamBuilder failed: %s", AAudio_convertResultToText(result));
+        LOGE("createStreamBuilder failed: %s", AAudio_convertResultToText(result));
         return -1;
     }
     AAudioStreamBuilder_setSampleRate(builder, this->sample_rate);
@@ -30,13 +31,13 @@ int AAudioRender::start() {
     AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
     AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_SHARED);
     if (!this->callback) {
-        LOGE(LOG_TAG, "callback is nullptr");
+        LOGE("callback is nullptr");
         return -1;
     }
     AAudioStreamBuilder_setDataCallback(builder, callback, user_data);
     result = AAudioStreamBuilder_openStream(builder, &stream);
     if (result != AAUDIO_OK) {
-        LOGE(LOG_TAG, "openStream failed: %s", AAudio_convertResultToText(result));
+        LOGE("openStream failed: %s", AAudio_convertResultToText(result));
         return -1;
     }
     this->format = AAudioStream_getFormat(stream);
@@ -44,7 +45,7 @@ int AAudioRender::start() {
     this->sample_rate = AAudioStream_getSampleRate(stream);
     result = AAudioStream_requestStart(stream);
     if (result != AAUDIO_OK) {
-        LOGE(LOG_TAG, "requestStart failed: %s", AAudio_convertResultToText(result));
+        LOGE("requestStart failed: %s", AAudio_convertResultToText(result));
         return -1;
     }
     AAudioStreamBuilder_delete(builder);
@@ -120,3 +121,23 @@ void AAudioRender::configure(int32_t sampleRate, int32_t channelCnt, aaudio_form
     this->format = fmt;
 }
 
+int aaudio_data_callback(AAudioStream* stream, void* userData, void* audioData, int32_t numFrames) {
+    auto* ringBuffer = static_cast<AudioRingBuffer*>(userData);
+    if (!ringBuffer) return AAUDIO_CALLBACK_RESULT_STOP;
+
+    int bytesPerFrame = 2 * sizeof(int16_t);  // stereo + S16
+    int totalBytes = numFrames * bytesPerFrame;
+
+    int readBytes = ringBuffer->read((uint8_t*)audioData, totalBytes);
+
+    if (readBytes < totalBytes) {
+        // Zero out remaining
+        memset((uint8_t*)audioData + readBytes, 0, totalBytes - readBytes);
+
+        if (ringBuffer->isFinished() && ringBuffer->isEmpty()) {
+            return AAUDIO_CALLBACK_RESULT_STOP;  // ✅ 告诉 AAudio 停止回调
+        }
+    }
+
+    return AAUDIO_CALLBACK_RESULT_CONTINUE;
+}

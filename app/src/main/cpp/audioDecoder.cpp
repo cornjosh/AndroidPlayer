@@ -13,6 +13,7 @@ extern "C" {
 #include <libavutil/opt.h>
 #include <libavutil/samplefmt.h>
 #include <libswresample/swresample.h>
+#include <libavutil/channel_layout.h>
 }
 
 void audioDecodeThread(PacketQueue* packetQueue, AudioRingBuffer* ringBuffer, AVCodecParameters* codecpar) {
@@ -28,12 +29,20 @@ void audioDecodeThread(PacketQueue* packetQueue, AudioRingBuffer* ringBuffer, AV
     avcodec_parameters_to_context(codecCtx, codecpar);
     avcodec_open2(codecCtx, codec, nullptr);
 
-    SwrContext* swrCtx = swr_alloc_set_opts(
-            nullptr,
-            AV_CH_LAYOUT_STEREO, AV_SAMPLE_FMT_S16, codecpar->sample_rate,
-            codecpar->channel_layout, codecpar->format, codecpar->sample_rate,
-            0, nullptr);
-    swr_init(swrCtx);
+    SwrContext* swrCtx = nullptr;
+    int ret = swr_alloc_set_opts2(&swrCtx,
+                                  &codecCtx->ch_layout,                 // 输出 layout
+                                  AV_SAMPLE_FMT_S16,          // 输出格式
+                                  codecCtx->sample_rate,      // 输出采样率
+                                  &codecCtx->ch_layout,       // 输入 layout
+                                  codecCtx->sample_fmt,       // 输入格式
+                                  codecCtx->sample_rate,      // 输入采样率
+                                  0, nullptr);
+
+    if (ret < 0 || !swrCtx || swr_init(swrCtx) < 0) {
+        LOGE("❌ Failed to initialize swrCtx");
+        return;
+    }
 
     AVFrame* frame = av_frame_alloc();
     AVPacket* pkt = nullptr;
