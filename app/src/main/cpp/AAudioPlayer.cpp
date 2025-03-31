@@ -1,5 +1,3 @@
-// AAudioPlayer.cpp
-
 #include <AAudio/AAudio.h>
 #include "audioRingBuffer.h"
 #include "log.h"
@@ -15,41 +13,96 @@ void AAudioPlayerThread(AudioRingBuffer* ringBuffer) {
 
     LOGI("🔊 Starting AAudio player thread");
 
-    // 创建 AAudio 流
-    AAudioStreamBuilder* builder = {};
+    if (ringBuffer == nullptr) {
+        LOGE("❌ RingBuffer is nullptr");
+        return;
+    }
+
+    // 创建 AAudioStreamBuilder 实例
+    AAudioStreamBuilder *builder;
+    aaudio_result_t result = AAudio_createStreamBuilder(&builder);
+    if (result != AAUDIO_OK) {
+        LOGE("❌ Failed to create AAudioStreamBuilder: %s", AAudio_convertResultToText(result));
+        return;
+    }
+
+    // 设置音频流参数
     AAudioStreamBuilder_setFormat(builder, AAUDIO_FORMAT_PCM_I16);
     AAudioStreamBuilder_setChannelCount(builder, 2);  // 立体声
     AAudioStreamBuilder_setSampleRate(builder, 44100); // 采样率
+    AAudioStreamBuilder_setDirection(builder, AAUDIO_DIRECTION_OUTPUT);
+    AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_EXCLUSIVE); // 或 SHARED 也行
+    AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+
 
     // 尝试打开音频流
-    AAudioResult result = AAudioStreamBuilder_openStream(builder, &stream);
+    aaudio_result_t result1 = AAudioStreamBuilder_openStream(builder, &stream);  // 改为 aaudio_result_t
 
-    if (result != AAUDIO_OK) {
+    LOGI("🎛 Opened stream info:");
+    LOGI("   Sample rate: %d", AAudioStream_getSampleRate(stream));
+    LOGI("   Channel count: %d", AAudioStream_getChannelCount(stream));
+    LOGI("   Format: %d", AAudioStream_getFormat(stream));
+    LOGI("   Buffer capacity: %d", AAudioStream_getBufferCapacityInFrames(stream));
+    LOGI("   Frames per burst: %d", AAudioStream_getFramesPerBurst(stream));
+
+    AAudioStream_requestStart(stream);
+
+    if (result1 != AAUDIO_OK) {
         LOGE("❌ Failed to open AAudio stream: %s", AAudio_convertResultToText(result));
         return;
     }
 
     LOGI("✅ AAudio stream successfully opened");
 
-    const size_t bufferSize = 192000; // 每次读取的最大字节数
-    uint8_t buffer[bufferSize];
+//    const size_t bufferSize = 192000; // 每次读取的最大字节数
+//    uint8_t buffer[bufferSize];
 
-    while (true) {
-        // 从环形缓冲区读取数据
-        size_t dataRead = ringBuffer->read(buffer, bufferSize);
+//    while (true) {
+//        // 从环形缓冲区读取数据
+//        size_t dataRead = ringBuffer->read(buffer, bufferSize);
+//
+//        if (dataRead == 0) {
+//            LOGD("🔄 Ring buffer is empty, sleeping...");
+//            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+//            continue;
+//        }
+//
+//        if (dataRead > 0) {
+//            LOGD("🎵 Read %zu bytes of audio data from ringBuffer", dataRead);
+//            // 确保流没有关闭
+//            if (stream != nullptr) {
+//                AAudioStream_write(stream, buffer, dataRead, 0);
+//            } else {
+//                LOGE("❌ AAudio stream is nullptr");
+//                break;
+//            }
+//        }
+//    }
 
-        // 如果读取到数据，写入到 AAudio 流
-        if (dataRead > 0) {
-            LOGD("🎵 Read %zu bytes of audio data from ringBuffer", dataRead);
-            AAudioStream_write(stream, buffer, dataRead, 0);
-        }
 
-        // 如果缓冲区没有数据，稍微休眠，避免高CPU占用
-        if (dataRead == 0) {
-            LOGD("🔄 Ring buffer is empty, sleeping...");
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
+
+     // 简单的纯音频数据：正弦波生成（440Hz）
+    const int sampleRate = 44100;
+    const int frequency = 440;  // A4
+    const int seconds = 5;
+    const int totalFrames = sampleRate * seconds;
+    int16_t* buffer = new int16_t[totalFrames * 2];  // stereo
+
+    for (int i = 0; i < totalFrames; ++i) {
+        float sample = 32767 * sinf(2.0f * M_PI * frequency * i / sampleRate);
+        buffer[2 * i] = (int16_t) sample;       // left
+        buffer[2 * i + 1] = (int16_t) sample;   // right
     }
+
+    // 🔥 写入帧数（不是字节数）
+    result = AAudioStream_write(stream, buffer, totalFrames, 100000000L); // 100ms timeout
+    if (result < 0) {
+        LOGE("❌ Failed to write to AAudio stream: %s", AAudio_convertResultToText(result));
+    } else {
+        LOGI("✅ Successfully wrote %d frames to stream", result);
+    }
+    std::this_thread::sleep_for(std::chrono::seconds(seconds));
+
 
     // 关闭流
     LOGI("🛑 Closing AAudio stream");
