@@ -10,7 +10,7 @@ extern "C" {
 
 #include <thread>
 
-void demuxThread(const char* inputPath, PacketQueue* queue, int* videoStreamIndexOut) {
+void demuxThread(const char* inputPath, PacketQueue* videoQueue, PacketQueue *audioQueue, int videoStreamIndex, int audioStreamIndex) {
     AVFormatContext *formatCtx = nullptr;
 
     LOGI("📂 Opening input: %s", inputPath);
@@ -26,30 +26,13 @@ void demuxThread(const char* inputPath, PacketQueue* queue, int* videoStreamInde
         return;
     }
 
-    int videoStreamIndex = -1;
-    for (unsigned int i = 0; i < formatCtx->nb_streams; i++) {
-        if (formatCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-            videoStreamIndex = static_cast<int>(i);
-            break;
-        }
-    }
-
-    if (videoStreamIndex == -1) {
-        LOGE("❌ No video stream found");
-        avformat_close_input(&formatCtx);
-        return;
-    }
-
-    *videoStreamIndexOut = videoStreamIndex;
-    LOGI("🎥 Video stream index: %d", videoStreamIndex);
-
     AVPacket *packet = av_packet_alloc();
 
     while (av_read_frame(formatCtx, packet) >= 0) {
         if (packet->stream_index == videoStreamIndex) {
             AVPacket *new_packet = av_packet_alloc();
             av_packet_ref(new_packet, packet);
-            LOGD("📦 Packet %p added to queue: time=%.3f pts=%lld dts=%lld duration=%lld size=%d",
+            LOGD("📦 Video Packet %p added to queue: time=%.3f pts=%lld dts=%lld duration=%lld size=%d",
                  new_packet,
                  packet->pts * av_q2d(formatCtx->streams[videoStreamIndex]->time_base),
                  new_packet->pts,
@@ -57,7 +40,19 @@ void demuxThread(const char* inputPath, PacketQueue* queue, int* videoStreamInde
                  new_packet->duration,
                  new_packet->size
             );
-            queue->push(new_packet);
+            videoQueue->push(new_packet);
+        } else if (packet->stream_index == audioStreamIndex){
+            AVPacket *new_packet = av_packet_alloc();
+            av_packet_ref(new_packet, packet);
+            LOGD("📦 Audio Packet %p added to queue: time=%.3f pts=%lld dts=%lld duration=%lld size=%d",
+                 new_packet,
+                 packet->pts * av_q2d(formatCtx->streams[audioStreamIndex]->time_base),
+                 new_packet->pts,
+                 new_packet->dts,
+                 new_packet->duration,
+                 new_packet->size
+            );
+            audioQueue->push(new_packet);
         }
         av_packet_unref(packet);
     }
@@ -65,7 +60,8 @@ void demuxThread(const char* inputPath, PacketQueue* queue, int* videoStreamInde
     LOGI("🛑 Reached end of file. Cleaning up.");
     av_packet_free(&packet);
     avformat_close_input(&formatCtx);
-    queue->setFinished(true);
+    videoQueue->setFinished(true);
+    audioQueue->setFinished(true);
 
     LOGI("✅ Demuxing thread finished");
 }
