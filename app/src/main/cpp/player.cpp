@@ -21,17 +21,19 @@ static PacketQueue* packetQueue = nullptr;
 static FrameQueue* frameQueue = nullptr;
 static AVFormatContext* formatCtx = nullptr;
 static int videoStreamIndex = -1;
+static int audioStreamIndex = -1;
 static AVRational videoTimeBase;
 static ANativeWindow* nativeWindow = nullptr;
 static std::string videoPath;
 static PacketQueue* audioPacketQueue = nullptr;
+
 
 // 线程句柄
 static std::thread demuxerThread;
 static std::thread decoderThread;
 static std::thread rendererThread;
 
-extern void demuxThread(const char* path, PacketQueue* queue, int* streamIndexOut);
+extern void demuxThread(const char* path, PacketQueue* videoQueue, PacketQueue* audioQueue, int videoStreamIndex, int audioStreamIndex);
 extern void decodeThread(PacketQueue* packetQueue, FrameQueue* frameQueue, AVCodecParameters* codecpar);
 extern void renderThread(FrameQueue* frameQueue, ANativeWindow* window, AVRational time_base);
 
@@ -65,7 +67,8 @@ Java_com_example_androidplayer_Player_nativePlay(JNIEnv *env, jobject thiz, jstr
 //    av_register_all();
     avformat_network_init();
 
-    packetQueue = new PacketQueue();
+    packetQueue = new PacketQueue();        // video
+    audioPacketQueue = new PacketQueue();   // ✅ audio
     frameQueue = new FrameQueue();
 
     // 打开视频获取 AVFormatContext
@@ -79,12 +82,16 @@ Java_com_example_androidplayer_Player_nativePlay(JNIEnv *env, jobject thiz, jstr
         return -2;
     }
 
-    // 找到视频流索引
+    // 找到视频流和音频流索引
     for (unsigned int i = 0; i < formatCtx->nb_streams; i++) {
         if (formatCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
             videoStreamIndex = i;
             videoTimeBase = formatCtx->streams[i]->time_base;
-            break;
+            LOGI("🎥 Video stream index: %d", videoStreamIndex);
+        }
+        if (formatCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO){
+            audioStreamIndex = i;
+            LOGI("🎵 Audio stream index: %d", audioStreamIndex);
         }
     }
 
@@ -93,9 +100,14 @@ Java_com_example_androidplayer_Player_nativePlay(JNIEnv *env, jobject thiz, jstr
         return -3;
     }
 
+    if (audioStreamIndex == -1) {
+        LOGE("❌ No audio stream found.");
+        return -4;
+    }
+
     LOGI("📦 Starting demux/decode/render threads...");
 
-    demuxerThread = std::thread(demuxThread, videoPath.c_str(), packetQueue, &videoStreamIndex);
+    demuxerThread = std::thread(demuxThread, videoPath.c_str(), packetQueue, audioPacketQueue, videoStreamIndex, audioStreamIndex);
     decoderThread = std::thread(decodeThread, packetQueue, frameQueue,
                                 formatCtx->streams[videoStreamIndex]->codecpar);
     rendererThread = std::thread(renderThread, frameQueue, nativeWindow, videoTimeBase);
