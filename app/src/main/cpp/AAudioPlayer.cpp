@@ -1,14 +1,17 @@
+// AAudioPlayer.cpp
 #include <AAudio/AAudio.h>
 #include "audioRingBuffer.h"
 #include "log.h"
 #define TAG "AAudioPlayer"
 
-double getAudioClock(AAudioStream *pStruct);
 
 #include <thread>
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
+#include "timer.h"
+
+double getAudioClock(AAudioStream *pStruct);
 
 // 播放音频数据的线程函数
 void AAudioPlayerThread(AudioRingBuffer* ringBuffer) {
@@ -66,10 +69,31 @@ void AAudioPlayerThread(AudioRingBuffer* ringBuffer) {
         size_t bytesRead = ringBuffer->read(buffer, bufferSize);
         if (bytesRead > 0) {
             int framesToWrite = bytesRead / (2 * sizeof(int16_t)); // stereo, 16-bit
-            AAudioStream_write(stream, buffer, framesToWrite, 100000000);
-            // 计算当前音频PTS
+
+            // 获取当前音频的PTS（播放时间）
             double audioPts = getAudioClock(stream);
-            LOGD("🎧 Audio PTS: %.3f sec", audioPts);
+            // 获取主时钟的当前时间
+            double masterClock = Timer::getCurrentTime();
+
+            // 计算音频与主时钟的时间差
+            double timeToSync = audioPts - masterClock;
+
+            // 根据时间差调整播放延迟（单位：微秒）
+            int64_t delayUs = static_cast<int64_t>((framesToWrite / 44100.0) * 1000000.0);
+
+            // 如果音频落后于主时钟，减少延迟（加速播放）
+            if (timeToSync < 0) {
+                delayUs += static_cast<int64_t>(-timeToSync * 1000000);
+            }
+                // 如果音频超前于主时钟，增加延迟（减慢播放）
+            else if (timeToSync > 0) {
+                delayUs -= static_cast<int64_t>(timeToSync * 1000000);
+            }
+
+            // 向音频流写入数据
+            AAudioStream_write(stream, buffer, framesToWrite, delayUs);
+
+            LOGD("🎧 Audio PTS: %.3f sec, Master Clock: %.3f sec, Delay: %ld us", audioPts, masterClock, delayUs);
         } else {
             if (ringBuffer->isFinished() && ringBuffer->isEmpty()) {
                 LOGI("🎉 Audio ring buffer fully played!");
@@ -93,7 +117,6 @@ double getAudioClock(AAudioStream *stream) {
     int sampleRate = AAudioStream_getSampleRate(stream);
 
     if (sampleRate <= 0) return 0.0;
-
     return (double)frames / sampleRate; // 单位：秒
 }
 

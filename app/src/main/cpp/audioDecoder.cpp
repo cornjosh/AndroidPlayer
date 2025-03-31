@@ -35,14 +35,14 @@ void audioDecodeThread(PacketQueue* packetQueue, AudioRingBuffer* ringBuffer, AV
     SwrContext* swrCtx = nullptr;
     AVChannelLayout outChLayout = AV_CHANNEL_LAYOUT_STEREO;
 
-    LOGD("🎧 swr_alloc_set_opts2 configuration: ");
-    LOGD("  Input channel layout: %llu", codecCtx->ch_layout.u.mask); // 打印输入的通道布局
-    LOGD("  Input sample format: %d", codecCtx->sample_fmt); // 打印输入格式
-    LOGD("  Input sample rate: %d", codecCtx->sample_rate); // 打印输入采样率
-
-    LOGD("  Output channel layout: %llu", outChLayout.u.mask); // 输出布局，假设为立体声
-    LOGD("  Output sample format: %d", AV_SAMPLE_FMT_S16); // 输出格式，假设为 S16
-    LOGD("  Output sample rate: %d", 44100); // 假设输出采样率和输入相同
+//    LOGD("🎧 swr_alloc_set_opts2 configuration: ");
+//    LOGD("  Input channel layout: %llu", codecCtx->ch_layout.u.mask); // 打印输入的通道布局
+//    LOGD("  Input sample format: %d", codecCtx->sample_fmt); // 打印输入格式
+//    LOGD("  Input sample rate: %d", codecCtx->sample_rate); // 打印输入采样率
+//
+//    LOGD("  Output channel layout: %llu", outChLayout.u.mask); // 输出布局，假设为立体声
+//    LOGD("  Output sample format: %d", AV_SAMPLE_FMT_S16); // 输出格式，假设为 S16
+//    LOGD("  Output sample rate: %d", 44100); // 假设输出采样率和输入相同
     int ret = swr_alloc_set_opts2(&swrCtx,
                                   &outChLayout,   // 输出 layout
                                   AV_SAMPLE_FMT_S16,         // 输出格式

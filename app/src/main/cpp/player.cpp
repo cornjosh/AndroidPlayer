@@ -29,6 +29,7 @@ static ANativeWindow* nativeWindow = nullptr;
 static std::string videoPath;
 static PacketQueue* audioPacketQueue = nullptr;
 static AudioRingBuffer* audioRingBuffer = new AudioRingBuffer(9600000);
+static Timer timer;
 
 // 线程同步变量
 
@@ -125,10 +126,11 @@ Java_com_example_androidplayer_Player_nativePlay(JNIEnv *env, jobject thiz, jstr
                                 formatCtx->streams[audioStreamIndex]->codecpar);
     aAudioPlayerThread = std::thread(AAudioPlayerThread, audioRingBuffer);
 
-    Timer timer;
     timer.setCurrentTime(-1); // 设置初始时间为 -1，表示未开始播放
     timer.setTimeSpeed(1.0); // 设置时间倍率为 1.0
     timer.start(); // 启动计时器线程
+    LOGI("⏱️ Timer started with initial time: %.3f", Timer::getCurrentTime());
+
 
     // 可选：detach 或 join 管理线程生命周期
     demuxerThread.detach();

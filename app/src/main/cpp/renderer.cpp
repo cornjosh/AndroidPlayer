@@ -4,6 +4,7 @@
 #define TAG "renderer"
 
 #include "frameQueue.h"
+#include "timer.h"
 
 #include <mutex>
 
@@ -183,9 +184,24 @@ void renderThread(FrameQueue* frameQueue, ANativeWindow* window, AVRational time
         AVFrame* frame = frameQueue->pop();
         if (!frame) continue;
 
-        // 打印调试时间戳
         double time_sec = frame->pts * av_q2d(time_base);
-        LOGD("🖼️ Rendering frame %p: time=%.3f pts=%lld", frame, time_sec, frame->pts);
+        double master_time = Timer::getCurrentTime(); // 主时钟 ⏱️
+        double delay = time_sec - master_time;
+
+
+        // 打印调试时间戳
+        LOGD("🖼️ Rendering Time=%.3f, Clock=%.3f, Delay=%.3f",
+             time_sec, master_time, delay);
+
+        if (delay > 0.02 && delay < 1.0) {
+            // 如果时间还没到，睡一小会儿等它到点再播放
+            std::this_thread::sleep_for(std::chrono::milliseconds((int)(delay * 1000)));
+        } else if (delay < -0.1) {
+            // 太迟了，说明滞后了，丢掉这个帧（如果你愿意）
+            LOGI("⚠️ Frame too late, skipping it...");
+            av_frame_free(&frame);
+            continue;
+        }
 
         // ✅ 调用此函数进行渲染
         renderFrameToSurface(frame, window);

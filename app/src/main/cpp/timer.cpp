@@ -7,6 +7,7 @@
 
 // 初始化静态变量
 std::atomic<double> Timer::currentTime(0.0);
+double baseTime = 0.0;  // 初始时间偏移
 
 Timer::Timer() : running(false), timeSpeed(1.0) {} // 默认时间倍率为 1.0
 
@@ -18,6 +19,7 @@ Timer::~Timer() {
 
 void Timer::start() {
     if (!running) {
+        baseTime = currentTime.load();  // <- 重要
         running = true;
         timerThread = std::thread(&Timer::updateTime, this); // 启动计时器线程
     }
@@ -40,14 +42,12 @@ void Timer::updateTime() {
         auto now = steady_clock::now();
         double elapsedSeconds = duration_cast<duration<double>>(now - startTime).count();
 
-        // 按照时间倍率调整 elapsedSeconds
-        double adjustedTime = elapsedSeconds * timeSpeed;
+        double adjustedTime = baseTime + elapsedSeconds * timeSpeed;
 
-        // 获取和更新当前时间（线程安全）
         setCurrentTime(adjustedTime);
 
-        // 每隔 50ms 更新一次时间
         std::this_thread::sleep_for(milliseconds(50));
+        LOGD("⏱️ Current Time: %.6f seconds", adjustedTime);
     }
 }
 
