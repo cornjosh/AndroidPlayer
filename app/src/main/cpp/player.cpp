@@ -11,6 +11,7 @@
 #include "packetQueue.h"
 #include "frameQueue.h"
 #include "audioRingBuffer.h"
+#include "timer.h"
 
 extern "C" {
 #include <libavformat/avformat.h>
@@ -74,7 +75,6 @@ Java_com_example_androidplayer_Player_nativePlay(JNIEnv *env, jobject thiz, jstr
     LOGI("▶️ nativeStart");
 
     // 初始化全局状态
-//    av_register_all();
     avformat_network_init();
 
     packetQueue = new PacketQueue();        // video
@@ -125,6 +125,10 @@ Java_com_example_androidplayer_Player_nativePlay(JNIEnv *env, jobject thiz, jstr
                                 formatCtx->streams[audioStreamIndex]->codecpar);
     aAudioPlayerThread = std::thread(AAudioPlayerThread, audioRingBuffer);
 
+    Timer timer;
+    timer.setCurrentTime(-1); // 设置初始时间为 -1，表示未开始播放
+    timer.setTimeSpeed(1.0); // 设置时间倍率为 1.0
+    timer.start(); // 启动计时器线程
 
     // 可选：detach 或 join 管理线程生命周期
     demuxerThread.detach();

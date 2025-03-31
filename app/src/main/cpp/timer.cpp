@@ -7,7 +7,6 @@
 
 // 初始化静态变量
 std::atomic<double> Timer::currentTime(0.0);
-std::mutex Timer::timeMutex;
 
 Timer::Timer() : running(false), timeSpeed(1.0) {} // 默认时间倍率为 1.0
 
@@ -48,17 +47,15 @@ void Timer::updateTime() {
         setCurrentTime(adjustedTime);
 
         // 每隔 50ms 更新一次时间
-        std::this_thread::sleep_for(milliseconds(10));
+        std::this_thread::sleep_for(milliseconds(50));
     }
 }
 
 double Timer::getCurrentTime() {
-    std::lock_guard<std::mutex> lock(timeMutex);  // 锁住时间
     return currentTime.load();
 }
 
 void Timer::setCurrentTime(double time) {
-    std::lock_guard<std::mutex> lock(timeMutex);  // 锁住时间
     currentTime.store(time);  // 更新当前时间
 }
 
