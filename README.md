@@ -74,6 +74,8 @@
 
 ## 已实现功能
 
+![截图](img/屏幕截图%202025-04-01%20140858.png)
+
 - [x] 交叉编译 FFmpeg 静态库，并打包成一个动态库 `libffmpeg.so`
 - [x] 创建 `log.h` 文件，实现 `LOGE`、`LOGI` 等日志打印宏
 - [x] 两个 `packetQueue`，一个 `videoPacketQueue` 和一个 `audioPacketQueue`，分别用于存放 `video packet` 和
