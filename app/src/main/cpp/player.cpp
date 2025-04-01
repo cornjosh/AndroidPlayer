@@ -161,7 +161,7 @@ Java_com_example_androidplayer_Player_nativePause(JNIEnv *env, jobject thiz, jbo
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_example_androidplayer_Player_nativeSeek(JNIEnv *env, jobject thiz, jdouble position) {
-    timer.setCurrentTime(position);
+    timer.seekTo(position);
     return 0;
 }
 
