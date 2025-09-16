@@ -2,19 +2,41 @@
 
 ## 项目简介
 
-这是一个从零开始构建的 Android 音视频播放器项目，完整记录了我在多媒体开发领域的学习成长历程。项目从基础的 FFmpeg 交叉编译开始，逐步实现了完整的音视频同步播放功能，包含了大量真实的技术挑战和解决方案。
+> 这是 **2025 年小米工程师训练营项目** 的一部分
 
-通过这个项目，我深入学习了 FFmpeg、音视频同步、多线程编程和 Android Native 开发等技术栈，更重要的是在解决实际问题的过程中不断提升了编程能力和系统性思维。
+一个从零开始构建的 Android 音视频播放器项目，完整记录了我在多媒体开发领域的学习成长历程。项目从基础的 FFmpeg 交叉编译开始，逐步实现了完整的音视频同步播放功能，包含了大量真实的技术挑战和解决方案。
+
+通过这个项目，深入学习 FFmpeg、音视频同步、多线程编程和 Android Native 开发等技术栈，以及在解决实际问题的过程中不断提升了编程能力和系统性思维。
 
 ## 学习成果展示
 
-![应用截图](img/屏幕截图%202025-04-01%20140858.png)
+**功能演示：** [录屏演示](录屏4.mp4)
 
-**最新功能演示：** [录屏演示](录屏4.mp4)
+**最终实现功能：**
+
+- [x] 交叉编译 FFmpeg 静态库，并打包成一个动态库 `libffmpeg.so`
+- [x] 创建 `log.h` 文件，实现 `LOGE`、`LOGI` 等日志打印宏
+- [x] 两个 `packetQueue`：`videoPacketQueue` 和 `audioPacketQueue`，分别存放 video/audio packet
+- [x] 一个 `frameQueue`，用于存放 video frame
+- [x] 一个 `audioRingBuffer`，用于存放 audio pcm
+- [x] **demux 线程**：对原视频进行解封装，得到 video/audio packet 并放入对应队列
+- [x] **decode 线程**：从 videoPacketQueue 获取 video packet 解码成 video frame，放入 frameQueue
+- [x] **audioDecode 线程**：从 audioPacketQueue 获取 audio packet 解码成 audio pcm，放入 audioRingBuffer
+- [x] **renderer 线程**：从 frameQueue 获取 video frame，使用 OpenGL 渲染到 SurfaceView
+- [x] **AAudioPlayer 线程**：从 audioRingBuffer 获取 audio pcm，使用 AAudio 播放音频
+- [x] **Timer 线程**：负责控制总体的播放进度和音视频同步
+
+### 附加功能实现
+- [x] 使用 Timer 实现进度条的显示功能
+- [x] 使用 Timer 实现非精确 seek 功能
+- [x] 使用 Timer 实现倍速播放功能
+- [x] 使用 Timer 实现暂停和继续播放功能
+- [x] 使用 isInit 实现播放器的初始化和释放功能（优雅的退出）
+
 
 ## 开发历程回顾
 
-### 🎯 **Day12: 基础架构搭建 - 从零开始的探索**
+### 🎯 **Day1: 基础架构搭建 - 从零开始的探索**
 
 这一阶段是整个项目的起点，也是我第一次真正接触音视频开发的复杂性。
 
@@ -62,12 +84,12 @@ $PREFIX/libffmpeg.so \
 ```
 
 **学习收获：**
-- 理解了静态库和动态库的区别及链接过程
+- 理解静态库和动态库的区别及链接过程
 - 掌握了 NDK 工具链的使用方法
 - 学会了处理 FFmpeg 头文件的正确方式
 
 #### 线程安全队列实现
-这是我第一次设计真正的多线程数据结构：
+设计真正的多线程数据结构：
 
 ```cpp
 void VideoPacketQueue::put(AVPacket* packet) {
@@ -87,26 +109,24 @@ AVPacket* VideoPacketQueue::get() {
 
 **作业完成录屏：** [录屏](录屏.mp4)
 
-![Day12成果](img/屏幕截图%202025-03-29%20084654.png)
-
 ---
 
-### 🚀 **Day13: 视频渲染实现 - 进入图形编程世界**
+### 🚀 **Day2: 视频渲染实现 - 进入图形编程世界**
 
 **学习任务扩展：**
 - 创建 `frameQueue` 用于存放 video frame
 - 实现 `renderer` 线程，使用 OpenGL 渲染到 SurfaceView
 - 创建 `player.cpp` 负责 Java 层交互，控制三个线程协作
 
-这一阶段让我接触到了 OpenGL ES 和 Android 图形系统的复杂性。
+这一阶段让我接触到 OpenGL ES 和 Android 图形系统的复杂性。
 
-**作业完成录屏：** [录屏2](录屏2.mp4)
+**作业完成录屏：** [录屏](录屏2.mp4)
 
 ---
 
-### 🎵 **Day14: 音视频同步 - 攻克核心难题**
+### 🎵 **Day3: 音视频同步 - 攻克核心难题**
 
-这是整个项目中最具挑战性的阶段，也是我学习成长最显著的部分。
+这是整个项目中最具挑战性的阶段，也是学习成长最显著的部分。
 
 **核心任务：**
 - 创建 `audioPacketQueue` 和 `audioDecoder`
@@ -115,38 +135,15 @@ AVPacket* VideoPacketQueue::get() {
 - 实现音视频同步机制
 - 附加功能：精确 seek 和倍速播放
 
-**最终实现功能：**
-
-- [x] 交叉编译 FFmpeg 静态库，并打包成一个动态库 `libffmpeg.so`
-- [x] 创建 `log.h` 文件，实现 `LOGE`、`LOGI` 等日志打印宏
-- [x] 两个 `packetQueue`：`videoPacketQueue` 和 `audioPacketQueue`，分别存放 video/audio packet
-- [x] 一个 `frameQueue`，用于存放 video frame
-- [x] 一个 `audioRingBuffer`，用于存放 audio pcm
-- [x] **demux 线程**：对原视频进行解封装，得到 video/audio packet 并放入对应队列
-- [x] **decode 线程**：从 videoPacketQueue 获取 video packet 解码成 video frame，放入 frameQueue
-- [x] **audioDecode 线程**：从 audioPacketQueue 获取 audio packet 解码成 audio pcm，放入 audioRingBuffer
-- [x] **renderer 线程**：从 frameQueue 获取 video frame，使用 OpenGL 渲染到 SurfaceView
-- [x] **AAudioPlayer 线程**：从 audioRingBuffer 获取 audio pcm，使用 AAudio 播放音频
-- [x] **Timer 线程**：负责控制总体的播放进度和音视频同步
-
-### 附加功能实现
-- [x] 使用 Timer 实现进度条的显示功能
-- [x] 使用 Timer 实现非精确 seek 功能
-- [x] 使用 Timer 实现倍速播放功能（暂时只能视频倍速）
-- [x] 使用 Timer 实现暂停和继续播放功能
-- [x] 使用 isInit 实现播放器的初始化和释放功能（优雅的退出）
-
-**最终演示：** [录屏4](录屏4.mp4)
-
 **音视频同步成功：** [录屏3](录屏3.mp4)
 
 ---
 
 ## 🔧 核心技术挑战与成长历程
 
-这个项目中遇到的真实技术难题，记录了我解决问题的完整思路和成长过程：
+这个项目中遇到的真实技术难题，记录我解决问题的完整思路：
 
-### 1. AAudio 播放器无法播放音频 - 初次接触音频API的困惑
+### 1. AAudio 播放器无法播放音频 - 初次接触音频 API
 
 **问题描述：** 最初遇到的一个主要问题是音频无法播放。通过逐步排查和调试，发现：
 - `AAudioStream` 未正确设置音频流格式，或者流未正确打开
@@ -156,7 +153,7 @@ AVPacket* VideoPacketQueue::get() {
 - 使用 `AAudio` API 创建流时，确保格式、通道数、采样率等参数正确设置，并调用 `AAudioStream_requestStart` 启动流
 - 增加适当的日志输出，以便在调试过程中及时发现问题
 
-**学习收获：** 第一次深入了解 Android 音频架构，理解了底层音频流的生命周期管理。
+**学习收获：** 深入了解 Android 音频架构，理解了底层音频流的生命周期管理。
 
 ### 2. 音频无法正确播放和流的关闭
 
