@@ -2,7 +2,9 @@
 
 ## 项目简介
 
-这是一个从零开始构建的 Android 音视频播放器项目，记录了我在多媒体开发领域的学习成长过程。通过这个项目，我深入学习了 FFmpeg、音视频同步、多线程编程和 Android Native 开发等技术栈，并在解决实际问题的过程中不断提升编程能力。
+这是一个从零开始构建的 Android 音视频播放器项目，完整记录了我在多媒体开发领域的学习成长历程。项目从基础的 FFmpeg 交叉编译开始，逐步实现了完整的音视频同步播放功能，包含了大量真实的技术挑战和解决方案。
+
+通过这个项目，我深入学习了 FFmpeg、音视频同步、多线程编程和 Android Native 开发等技术栈，更重要的是在解决实际问题的过程中不断提升了编程能力和系统性思维。
 
 ## 学习成果展示
 
@@ -10,652 +12,306 @@
 
 **最新功能演示：** [录屏演示](录屏4.mp4)
 
-## 技术学习历程
+## 开发历程回顾
 
-### 🎯 **阶段一：基础架构搭建 (Day12)**
+### 🎯 **Day12: 基础架构搭建 - 从零开始的探索**
 
-**学习目标：** 掌握 FFmpeg 交叉编译和基础视频解码
+这一阶段是整个项目的起点，也是我第一次真正接触音视频开发的复杂性。
 
-**遇到的挑战：**
-- 初次接触 FFmpeg 交叉编译，编译配置复杂
-- 理解视频解封装和解码的基本概念
-- 线程间通信和数据传递的设计
 
-**解决过程：**
+**学习任务和挑战：**
+- 交叉编译 FFmpeg 静态库，并打包成一个动态库 `libffmpeg.so`
+- 创建线程安全的包队列 (`packetQueue`)
+- 实现 demux 线程进行视频解封装
+- 实现 decode 线程进行视频解码
+- 解码后的 video frame 以 YUV420P 格式存储到文件
 
-1. **FFmpeg 交叉编译深度实践**
-   ```bash
-   # 关键编译配置
-   --enable-static --disable-shared
-   --enable-cross-compile --target-os=android
-   --arch=aarch64 --cpu=armv8-a
-   ```
-   - 学习了 NDK 工具链的使用，掌握 `aarch64-linux-android-ld` 链接器
-   - 解决了静态库打包为动态库的技术难题，生成 `libffmpeg.so`
-   - 配置 CMakeLists.txt，正确设置头文件路径和库链接
+**实际实现过程：**
 
-2. **线程安全队列架构设计**
-   ```cpp
-   class PacketQueue {
-       std::queue<AVPacket*> queue;
-       mutable std::mutex mtx;
-       std::condition_variable cv;
-       bool finished = false;
-   };
-   ```
-   - 实现生产者-消费者模式，使用条件变量实现阻塞等待
-   - 设计优雅的队列生命周期管理，支持 `setFinished()` 状态控制
-   - 确保内存安全，每个 packet 使用 `av_packet_ref()` 进行引用计数
+#### 初始化项目
+- 使用示例代码创建 Android Studio 项目
+- 使用 git 管理代码，设置 remote
+- 遇到第一个问题：编译错误，缺少 `log.h` 文件
+- **解决：** 创建 `log.h` 文件，添加 `#include <android/log.h>` 头文件
 
-3. **多媒体处理流水线**
-   - **Demux 线程**: 使用 `avformat_open_input()` 和 `av_read_frame()` 解封装
-   - **Decode 线程**: 配置解码器上下文，实现 packet → frame 转换
-   - **存储模块**: 将 YUV420P 帧数据写入文件，验证解码正确性
+#### FFmpeg 交叉编译挑战
+修改 `ffmpeg.sh` 脚本，这是我第一次深度接触交叉编译：
 
-**收获：**
-- **工程能力**: 掌握了复杂的 C++ 交叉编译工具链使用
-- **架构思维**: 理解了多媒体处理的标准流水线模式
-- **并发编程**: 学会了使用现代 C++ 同步原语进行线程协调
-- **调试技能**: 建立了完整的日志系统，学会分析多线程程序的执行流程
+```bash
+echo "开始编译ffmpeg so"
+# NDK路径
+NDK=/home/ubuntu2204/Android/Sdk/ndk/21.3.6528147
+PLATFORM=$NDK/platforms/android-21/arch-arm64
+TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64
+PREFIX=/home/ubuntu2204/code/day9/build/ffmpeg/android_outputS/usr/local
 
-### 🚀 **阶段二：视频渲染实现 (Day13)**
+$TOOLCHAIN/bin/aarch64-linux-android-ld \
+-rpath-link=$PLATFORM/usr/lib \
+-L$PLATFORM/usr/lib \
+-L$PREFIX/lib \
+-soname libffmpeg.so -shared -nostdlib -Bsymbolic --whole-archive --no-undefined -o \
+$PREFIX/libffmpeg.so \
+    $PREFIX/lib/libavcodec.a \
+    $PREFIX/lib/libavfilter.a \
+    $PREFIX/lib/libswresample.a \
+    $PREFIX/lib/libavformat.a \
+    $PREFIX/lib/libavutil.a \
+    $PREFIX/lib/libswscale.a \
+    -lc -lm -lz -ldl -llog --dynamic-linker=/system/bin/linker \
+    $TOOLCHAIN/lib/gcc/aarch64-linux-android/4.9.x/libgcc_real.a
+```
 
-**学习目标：** 实现视频帧的 OpenGL 渲染显示
+**学习收获：**
+- 理解了静态库和动态库的区别及链接过程
+- 掌握了 NDK 工具链的使用方法
+- 学会了处理 FFmpeg 头文件的正确方式
 
-**技术突破：**
+#### 线程安全队列实现
+这是我第一次设计真正的多线程数据结构：
 
-1. **OpenGL ES 渲染管线深度实现**
-   ```cpp
-   // EGL 上下文初始化关键代码
-   EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-   EGLContext context = eglCreateContext(display, config, EGL_NO_CONTEXT, contextAttribs);
-   EGLSurface surface = eglCreateWindowSurface(display, config, nativeWindow, nullptr);
-   ```
-   
-2. **YUV→RGBA 颜色空间转换优化**
-   ```cpp
-   // 使用 swscale 进行高效转换
-   SwsContext *swsCtx = sws_getContext(
-       srcWidth, srcHeight, AV_PIX_FMT_YUV420P,
-       dstWidth, dstHeight, AV_PIX_FMT_RGBA,
-       SWS_BILINEAR, nullptr, nullptr, nullptr
-   );
-   ```
-   
-3. **着色器程序架构**
-   - **顶点着色器**: 处理纹理坐标变换，支持不同分辨率适配
-   - **片段着色器**: 实现纹理采样和颜色输出
-   - **纹理管理**: 使用 `glTexImage2D()` 上传帧数据，优化内存使用
-
-**关键学习点：**
-- **EGL 环境管理**: 解决了上下文创建、Surface 绑定的复杂性
-- **纹理数据流**: 掌握了从 CPU 内存到 GPU 纹理的数据传输
-- **渲染同步**: 实现了帧率控制，避免过度渲染消耗性能
-- **内存优化**: 使用纹理复用机制，减少频繁的 GPU 内存分配
-
-**技术难点突破**：
-- **Surface 尺寸问题**: 通过 ConstraintLayout 约束确保 SurfaceView 正确显示
-- **EGL 重复初始化**: 使用单例模式和互斥锁保证上下文唯一性
-- **纹理格式适配**: 处理不同设备对纹理格式的兼容性问题
-
-**成果：** 实现了基础的视频播放功能
-
-### 🎵 **阶段三：音频播放与同步 (Day14)**
-
-**学习目标：** 攻克音视频同步这一核心难题
-
-这个阶段是整个项目中最具挑战性的部分，也是我学习成长最为显著的阶段。
-
-#### 核心挑战：音视频同步
-
-这是整个项目中最复杂的部分，我通过一系列问题的解决过程，深度学习了多媒体播放器的核心原理：
-
-**挑战1: AAudio 音频播放架构**
-- **问题分析**: AAudio 是 Android 高性能音频 API，但配置复杂，需要精确的参数设置
-- **技术实现**: 
-  ```cpp
-  // AAudio 流配置
-  AAudioStreamBuilder_setFormat(builder, AAUDIO_FORMAT_PCM_I16);
-  AAudioStreamBuilder_setChannelCount(builder, 2);
-  AAudioStreamBuilder_setSampleRate(builder, 44100);
-  AAudioStreamBuilder_setDirection(builder, AAUDIO_DIRECTION_OUTPUT);
-  ```
-- **解决策略**: 
-  - 深入研究音频流生命周期: `requestStart()` → `write()` → `requestStop()`
-  - 实现回调机制，使用 `AAudioStream_getFramesWritten()` 计算播放进度
-  - 优化缓冲区管理，防止音频卡顿和丢帧
-- **技术收获**: 掌握了 Android 底层音频系统架构，理解了低延迟音频处理原理
-
-**挑战2: 音视频时间戳同步核心算法**
-- **问题深度**: 音视频同步是多媒体播放器的核心技术难题，涉及 PTS 计算、时钟同步、帧率控制
-- **创新设计**: 中央时间管理器 (Timer) 架构
-  ```cpp
-  class Timer {
-      static std::atomic<double> currentTime;  // 原子操作确保线程安全
-      static std::mutex controlMutex;
-      static std::condition_variable pauseCond;
-      double timeSpeed;  // 支持倍速播放
-  };
-  ```
-- **算法实现**:
-  - **音频 PTS 计算**: `pts = frames_written / sample_rate`
-  - **视频帧同步**: 比较视频帧 PTS 与当前时间，决定显示时机
-  - **动态调整**: 根据缓冲区状态调整播放速度，保持同步
-- **技术亮点**: 
-  - 使用 `std::atomic` 实现无锁时间读取，提高性能
-  - 条件变量实现精确的暂停/恢复控制
-  - 支持精确到毫秒级的 seek 操作
-
-**挑战3: 五线程协调架构**
-- **系统设计**: 
-  ```
-  Demux Thread (生产者)
-      ↓
-  PacketQueue (视频) → Decode Thread → FrameQueue → Render Thread
-  PacketQueue (音频) → AudioDecode Thread → RingBuffer → AAudio Thread
-      ↓
-  Timer Thread (中央时钟同步)
-  ```
-- **技术挑战**:
-  - **线程生命周期**: 实现优雅的启动和关闭机制
-  - **资源竞争**: 使用 RAII 模式管理 AVFrame/AVPacket 内存
-  - **异常处理**: 任一线程异常时，其他线程能够安全退出
-- **架构优势**:
-  - **解耦设计**: 每个线程职责单一，便于调试和优化
-  - **缓冲机制**: 队列缓冲抵抗网络抖动和解码性能波动
-  - **扩展性**: 架构支持添加更多功能模块（如字幕、特效等）
-
-#### 高级功能开发深度实现
-
-通过基础功能的扎实掌握，我进一步挑战了更复杂的播放器功能：
-
-1. **精确 Seek 功能**
-   - **技术原理**: 基于关键帧 (I-frame) 的快速定位算法
-   - **实现细节**:
-     ```cpp
-     // 关键帧搜索
-     av_seek_frame(formatCtx, videoStreamIndex, timestamp, AVSEEK_FLAG_BACKWARD);
-     avcodec_flush_buffers(codecCtx);  // 清空解码器缓冲区
-     ```
-   - **优化策略**: 
-     - 向前搜索最近关键帧，减少解码开销
-     - 清空所有队列缓冲区，避免旧数据干扰
-     - 重新同步音视频时间戳
-
-2. **倍速播放核心机制**
-   - **算法设计**: 修改 Timer 更新频率实现时间加速
-   ```cpp
-   void Timer::setTimeSpeed(double speed) {
-       timeSpeed = speed;
-       // 音频需要变调处理或跳帧
-   }
-   ```
-   - **技术挑战**: 
-     - 视频倍速: 通过跳帧和时间戳调整实现
-     - 音频倍速: 需要音频重采样技术（当前版本专注视频倍速）
-     - 同步保持: 确保音视频在变速过程中保持同步
-
-3. **播放状态管理系统**
-   - **状态机设计**: None → Playing → Paused → Seeking → End
-   - **实现架构**:
-     ```cpp
-     enum class PlayerState { None, Playing, Paused, End, Seeking };
-     static std::atomic<PlayerState> currentState;
-     ```
-   - **优雅控制**: 
-     - 暂停时冻结所有解码线程，保持当前帧显示
-     - 恢复时重新激活线程，从暂停点继续播放
-     - 状态变更时的资源管理和清理
-
-4. **进度条实时反馈**
-   - **计算精度**: 基于音频 PTS 提供毫秒级进度精度
-   - **UI 更新**: 通过 JNI 回调定期更新 Java 层进度条
-   - **用户交互**: 支持拖拽进度条触发 seek 操作
-
-## 🔧 关键技术突破与解决思路
-
-### 内存管理优化 - 从崩溃到稳定的蜕变
-
-**问题背景**: 初期版本运行几分钟后设备死机，通过调试发现是严重的内存泄漏问题
-
-**深度分析过程**:
-1. **问题定位**: 使用 Valgrind 和 AddressSanitizer 分析内存泄漏点
-2. **根因发现**: AVFrame 解码后未及时释放，内存累积达到 GB 级别
-3. **系统性影响**: 不仅影响应用，还导致系统 OOM Killer 杀死进程
-
-**技术解决方案**:
 ```cpp
-// RAII 内存管理模式
-class FrameHolder {
-    AVFrame* frame;
-public:
-    FrameHolder() : frame(av_frame_alloc()) {}
-    ~FrameHolder() { av_frame_free(&frame); }
-    AVFrame* get() { return frame; }
-};
+void VideoPacketQueue::put(AVPacket* packet) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    queue_.push(packet);
+    cond_.notify_one();
+}
 
-// 帧复用池设计
-class FramePool {
-    std::queue<AVFrame*> availableFrames;
-    std::mutex poolMutex;
-public:
-    AVFrame* acquire();
-    void release(AVFrame* frame);
-};
+AVPacket* VideoPacketQueue::get() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    cond_.wait(lock, [this] { return!queue_.empty(); });
+    AVPacket* packet = queue_.front();
+    queue_.pop();
+    return packet;
+}
 ```
 
-**优化成果**:
-- **内存使用**: 从无限增长降至稳定的 50MB 以内
-- **性能提升**: GC 压力减小，整体流畅度提升 40%
-- **稳定性**: 连续播放 24 小时无崩溃
+**作业完成录屏：** [录屏](录屏.mp4)
 
-### 渲染管道设计 - 从黑屏到完美显示
-
-**技术挑战分析**:
-1. **Surface 黑屏问题**: SurfaceView 未正确设置约束，尺寸为 0x0
-2. **EGL 重复初始化**: 多线程环境下 EGL 上下文被重复创建，导致渲染失败
-3. **纹理格式不匹配**: 不同设备对纹理格式支持差异
-
-**系统化解决过程**:
-```cpp
-// EGL 单例管理
-class EGLManager {
-private:
-    static std::mutex instanceMutex;
-    static std::unique_ptr<EGLManager> instance;
-    EGLDisplay display;
-    EGLContext context;
-    
-public:
-    static EGLManager& getInstance() {
-        std::lock_guard<std::mutex> lock(instanceMutex);
-        if (!instance) {
-            instance = std::make_unique<EGLManager>();
-        }
-        return *instance;
-    }
-    
-    bool initializeContext(ANativeWindow* window);
-    void makeCurrent();
-    void swapBuffers();
-};
-```
-
-**渲染优化策略**:
-- **纹理缓存**: 实现 LRU 纹理缓存，减少 GPU 内存分配
-- **帧率控制**: 根据视频帧率动态调整渲染频率
-- **异步渲染**: 使用双缓冲技术，避免渲染阻塞
-
-### 多线程架构设计 - 高并发协调机制
-
-**架构演进过程**:
-```cpp
-// 线程安全的状态管理
-class ThreadSafeState {
-    std::atomic<bool> running{true};
-    std::atomic<bool> paused{false};
-    std::mutex stateMutex;
-    std::condition_variable stateCV;
-    
-public:
-    void waitForResume() {
-        std::unique_lock<std::mutex> lock(stateMutex);
-        stateCV.wait(lock, [this] { return !paused.load() || !running.load(); });
-    }
-    
-    void notifyStateChange() {
-        stateCV.notify_all();
-    }
-};
-```
-
-**高级同步机制**:
-1. **优雅退出**: 所有线程支持 graceful shutdown，避免资源泄漏
-2. **异常传播**: 线程异常能够传播到主线程，统一处理
-3. **负载均衡**: 动态调整队列大小，平衡内存使用和性能
-
-**性能监控体系**:
-- **实时指标**: 队列深度、解码速率、渲染帧率
-- **瓶颈识别**: 自动识别性能瓶颈线程
-- **自适应调优**: 根据设备性能动态调整参数
-
-## 💡 项目亮点与创新
-
-### 1. 自主设计的时间同步算法
-**核心创新**: 中央时间管理器 + 原子操作的高性能同步方案
-```cpp
-class Timer {
-    static std::atomic<double> currentTime;  // 无锁时间访问
-    static std::condition_variable pauseCond; // 精确暂停控制
-    double timeSpeed;  // 倍速播放支持
-    
-    void updateTime() {
-        auto now = std::chrono::high_resolution_clock::now();
-        double deltaTime = std::chrono::duration<double>(now - lastUpdate).count();
-        currentTime.store(currentTime.load() + deltaTime * timeSpeed);
-    }
-};
-```
-**技术优势**:
-- **高精度**: 毫秒级时间同步精度
-- **低开销**: 原子操作避免锁竞争，性能提升 60%
-- **灵活性**: 支持 0.5x - 2.0x 倍速播放
-- **精确 Seek**: 支持精确到帧级别的跳转
-
-### 2. 高效的内存管理策略
-**环形缓冲区设计**: 为音频数据流优化的无锁数据结构
-```cpp
-class AudioRingBuffer {
-    uint8_t* buffer;
-    std::atomic<size_t> writePos{0};
-    std::atomic<size_t> readPos{0};
-    std::atomic<size_t> size{0};
-    size_t capacity;
-    
-    // 无锁写入
-    void write(const uint8_t* data, size_t len) {
-        size_t currentWrite = writePos.load();
-        // 原子性写入逻辑
-    }
-};
-```
-**创新特点**:
-- **零拷贝**: 直接在环形缓冲区中操作，避免数据拷贝
-- **动态大小**: 根据网络状况自动调整缓冲区大小
-- **溢出保护**: 智能丢弃过期数据，保持实时性
-
-**智能帧复用机制**:
-```cpp
-class FramePool {
-    std::vector<std::unique_ptr<AVFrame, FrameDeleter>> pool;
-    std::queue<AVFrame*> available;
-    
-public:
-    AVFrame* acquire() {
-        if (available.empty()) {
-            expandPool();
-        }
-        return available.front();
-    }
-};
-```
-
-### 3. 完整的播放器生态系统
-**分层架构设计**:
-```
-┌─────────────────┐
-│   Java UI 层    │ ← SeekBar, 播放控制, 状态显示
-├─────────────────┤
-│   JNI 接口层    │ ← 状态回调, 进度更新, 异常处理
-├─────────────────┤
-│  C++ 核心层     │ ← 多线程调度, 音视频同步
-├─────────────────┤
-│  FFmpeg 解码层  │ ← 解封装, 解码, 格式转换
-├─────────────────┤
-│  系统 API 层    │ ← AAudio, OpenGL ES, Surface
-└─────────────────┘
-```
-
-**模块化设计优势**:
-- **可测试性**: 每个模块独立可测，单元测试覆盖率 85%+
-- **可扩展性**: 支持插件式功能扩展（字幕、滤镜等）
-- **可维护性**: 清晰的接口定义，模块间低耦合
-- **跨平台性**: 核心算法可移植到 iOS 等其他平台
-
-### 4. 高级调试和监控系统
-**实时性能监控**:
-```cpp
-class PerformanceMonitor {
-    struct Metrics {
-        std::atomic<uint64_t> framesDecoded{0};
-        std::atomic<uint64_t> framesRendered{0};
-        std::atomic<double> avgDecodeTime{0.0};
-        std::atomic<size_t> queueDepth{0};
-    };
-    
-    void updateMetrics();
-    void reportPerformance();
-};
-```
-**监控指标**:
-- **解码性能**: 平均解码时间、帧率统计
-- **内存使用**: 队列深度、缓冲区使用率
-- **同步精度**: 音视频同步偏差统计
-- **系统资源**: CPU 使用率、GPU 负载
-
-## 📚 技术栈与学习成果
-
-### 核心技术栈
-- **多媒体处理:** FFmpeg、音视频编解码
-- **图形渲染:** OpenGL ES、EGL、Surface
-- **音频播放:** AAudio、PCM 处理
-- **并发编程:** C++ 多线程、同步原语
-- **移动开发:** Android NDK、JNI
-
-### 能力提升总结
-- **系统性思维:** 从单个功能实现转向整体架构设计
-- **问题解决:** 培养了系统化的调试和问题定位能力  
-- **性能优化:** 学会了从内存、CPU、GPU 多维度优化程序性能
-- **代码质量:** 重视代码的可维护性和扩展性
-
-## 🎥 演示与验证
-
-| 功能演示 | 描述 |
-|---------|------|
-| [基础播放](录屏.mp4) | Day12: 基础视频解码和存储 |
-| [视频渲染](录屏2.mp4) | Day13: 实现视频帧渲染显示 |
-| [音视频同步](录屏3.mp4) | Day14: 完整的音视频同步播放 |
-| [完整功能](录屏4.mp4) | 最终版本：包含所有控制功能 |
-
-## 🚀 学习历程回顾
-
-这个项目让我从一个多媒体编程的初学者，成长为能够独立设计和实现复杂音视频应用的开发者。每一个技术难题的解决，都是一次深度学习的机会：
-
-- **从理论到实践:** 将书本上的音视频同步理论，转化为可工作的代码实现
-- **从功能到性能:** 不仅实现了功能，更关注用户体验和性能优化
-- **从单点到系统:** 学会了系统性地思考和设计软件架构
-
-通过这个项目，我深刻体会到了**持续学习**和**主动解决问题**的重要性。每一行代码的背后，都是对技术深度的追求和对完美的不懈追求。
-
-## 🔗 项目架构深度解析
-
-### 整体架构图
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Android Application Layer                │
-├─────────────────────────────────────────────────────────────┤
-│  MainActivity.java  │  Player.java  │  播放控制UI │ 进度显示  │
-├─────────────────────────────────────────────────────────────┤
-│                        JNI Interface                       │
-├─────────────────────────────────────────────────────────────┤
-│                     C++ Core Engine                        │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌────────┐  │
-│  │Demux Thread │ │Timer Thread │ │Decode Thread│ │Render  │  │
-│  │             │ │             │ │             │ │Thread  │  │
-│  └─────────────┘ └─────────────┘ └─────────────┘ └────────┘  │
-│         │               │               │            │       │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌────────┐  │
-│  │PacketQueue  │ │ TimeSync    │ │ FrameQueue  │ │OpenGL  │  │
-│  │(Video/Audio)│ │ Controller  │ │             │ │Renderer│  │
-│  └─────────────┘ └─────────────┘ └─────────────┘ └────────┘  │
-│         │               │               │            │       │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌────────┐  │
-│  │AudioDecoder │ │   Seek      │ │AudioRing    │ │AAudio  │  │
-│  │Thread       │ │ Controller  │ │Buffer       │ │Player  │  │
-│  └─────────────┘ └─────────────┘ └─────────────┘ └────────┘  │
-├─────────────────────────────────────────────────────────────┤
-│                      FFmpeg Libraries                      │
-│    libavformat  │  libavcodec  │  libswscale  │  libavutil  │
-├─────────────────────────────────────────────────────────────┤
-│                    Android System APIs                     │
-│    AAudio API   │  OpenGL ES   │   Surface    │    EGL     │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 核心模块详细设计
-
-#### 1. 数据流管道架构
-```cpp
-// 生产者-消费者模式的完整实现
-template<typename T>
-class ThreadSafeQueue {
-private:
-    std::queue<T> queue;
-    mutable std::mutex mtx;
-    std::condition_variable condition;
-    bool finished = false;
-    size_t maxSize = 100;  // 背压控制
-    
-public:
-    void push(T item) {
-        std::unique_lock<std::mutex> lock(mtx);
-        // 背压控制: 队列满时阻塞生产者
-        condition.wait(lock, [this] { 
-            return queue.size() < maxSize || finished; 
-        });
-        
-        if (!finished) {
-            queue.push(std::move(item));
-            condition.notify_one();
-        }
-    }
-    
-    T pop() {
-        std::unique_lock<std::mutex> lock(mtx);
-        condition.wait(lock, [this] { 
-            return !queue.empty() || finished; 
-        });
-        
-        if (queue.empty()) return T{};
-        
-        T result = std::move(queue.front());
-        queue.pop();
-        condition.notify_one();  // 通知生产者可以继续
-        return result;
-    }
-};
-```
-
-#### 2. 内存管理子系统
-```cpp
-class MemoryManager {
-private:
-    // 对象池管理
-    std::array<std::unique_ptr<ObjectPool<AVFrame>>, 3> framePools;
-    std::unique_ptr<ObjectPool<AVPacket>> packetPool;
-    
-    // 内存统计
-    std::atomic<size_t> totalAllocated{0};
-    std::atomic<size_t> peakUsage{0};
-    
-public:
-    template<typename T>
-    T* acquire() {
-        auto obj = getPool<T>()->acquire();
-        updateStatistics(sizeof(T));
-        return obj;
-    }
-    
-    template<typename T>
-    void release(T* obj) {
-        getPool<T>()->release(obj);
-        updateStatistics(-sizeof(T));
-    }
-};
-```
-
-#### 3. 线程调度系统
-```cpp
-class ThreadScheduler {
-private:
-    struct ThreadInfo {
-        std::thread worker;
-        std::atomic<bool> running{true};
-        std::atomic<int> priority{0};
-        ThreadFunction function;
-    };
-    
-    std::vector<ThreadInfo> threads;
-    std::atomic<bool> globalStop{false};
-    
-public:
-    void startAll() {
-        for (auto& info : threads) {
-            info.worker = std::thread([&info, this] {
-                setThreadPriority(info.priority);
-                while (info.running && !globalStop) {
-                    info.function();
-                    std::this_thread::yield();
-                }
-            });
-        }
-    }
-    
-    void gracefulShutdown() {
-        globalStop = true;
-        for (auto& info : threads) {
-            info.running = false;
-            if (info.worker.joinable()) {
-                info.worker.join();
-            }
-        }
-    }
-};
-```
-
-### 关键算法实现
-
-#### 音视频同步算法
-```cpp
-class AVSynchronizer {
-private:
-    static constexpr double SYNC_THRESHOLD = 0.040;  // 40ms 同步阈值
-    static constexpr double MAX_DELAY = 0.100;       // 最大延迟
-    
-    double videoClock = 0.0;
-    double audioClock = 0.0;
-    std::atomic<double> masterClock{0.0};
-    
-public:
-    bool shouldDisplayFrame(double framePts) {
-        double diff = framePts - masterClock.load();
-        
-        if (diff > SYNC_THRESHOLD) {
-            // 视频超前，延迟显示
-            return false;
-        } else if (diff < -SYNC_THRESHOLD) {
-            // 视频滞后，跳帧处理
-            if (diff < -MAX_DELAY) {
-                return false;  // 跳过此帧
-            }
-        }
-        return true;
-    }
-    
-    void updateAudioClock(double pts) {
-        audioClock = pts;
-        masterClock = pts;  // 以音频为基准
-    }
-};
-```
-
-### 性能优化策略
-
-#### 1. CPU 优化
-- **SIMD 指令**: 使用 NEON 指令集优化 YUV 转换
-- **分支预测**: 减少条件判断，使用模板特化
-- **缓存友好**: 数据结构对齐，提高缓存命中率
-
-#### 2. 内存优化
-- **零拷贝**: 数据在管道中传递指针，避免拷贝
-- **预分配**: 启动时预分配常用对象，避免运行时分配
-- **内存池**: 分级内存池，减少碎片化
-
-#### 3. GPU 优化
-- **纹理缓存**: LRU 缓存策略，复用纹理对象
-- **着色器优化**: 编译时优化着色器代码
-- **批量渲染**: 合并多个渲染调用
+![Day12成果](img/屏幕截图%202025-03-29%20084654.png)
 
 ---
 
-*这个项目记录了我在音视频开发领域的学习成长历程，从基础的 FFmpeg 使用到复杂的多线程同步，每一步都充满了挑战和收获。希望我的学习经历能够为其他开发者提供参考和启发。*
+### 🚀 **Day13: 视频渲染实现 - 进入图形编程世界**
+
+**学习任务扩展：**
+- 创建 `frameQueue` 用于存放 video frame
+- 实现 `renderer` 线程，使用 OpenGL 渲染到 SurfaceView
+- 创建 `player.cpp` 负责 Java 层交互，控制三个线程协作
+
+这一阶段让我接触到了 OpenGL ES 和 Android 图形系统的复杂性。
+
+**作业完成录屏：** [录屏2](录屏2.mp4)
+
+---
+
+### 🎵 **Day14: 音视频同步 - 攻克核心难题**
+
+这是整个项目中最具挑战性的阶段，也是我学习成长最显著的部分。
+
+**核心任务：**
+- 创建 `audioPacketQueue` 和 `audioDecoder`
+- 实现 `audioRingBuffer` 环形缓冲区
+- 创建 `AAudioPlayer` 使用 AAudio 播放音频
+- 实现音视频同步机制
+- 附加功能：精确 seek 和倍速播放
+
+**最终实现功能：**
+
+- [x] 交叉编译 FFmpeg 静态库，并打包成一个动态库 `libffmpeg.so`
+- [x] 创建 `log.h` 文件，实现 `LOGE`、`LOGI` 等日志打印宏
+- [x] 两个 `packetQueue`：`videoPacketQueue` 和 `audioPacketQueue`，分别存放 video/audio packet
+- [x] 一个 `frameQueue`，用于存放 video frame
+- [x] 一个 `audioRingBuffer`，用于存放 audio pcm
+- [x] **demux 线程**：对原视频进行解封装，得到 video/audio packet 并放入对应队列
+- [x] **decode 线程**：从 videoPacketQueue 获取 video packet 解码成 video frame，放入 frameQueue
+- [x] **audioDecode 线程**：从 audioPacketQueue 获取 audio packet 解码成 audio pcm，放入 audioRingBuffer
+- [x] **renderer 线程**：从 frameQueue 获取 video frame，使用 OpenGL 渲染到 SurfaceView
+- [x] **AAudioPlayer 线程**：从 audioRingBuffer 获取 audio pcm，使用 AAudio 播放音频
+- [x] **Timer 线程**：负责控制总体的播放进度和音视频同步
+
+### 附加功能实现
+- [x] 使用 Timer 实现进度条的显示功能
+- [x] 使用 Timer 实现非精确 seek 功能
+- [x] 使用 Timer 实现倍速播放功能（暂时只能视频倍速）
+- [x] 使用 Timer 实现暂停和继续播放功能
+- [x] 使用 isInit 实现播放器的初始化和释放功能（优雅的退出）
+
+**最终演示：** [录屏4](录屏4.mp4)
+
+**音视频同步成功：** [录屏3](录屏3.mp4)
+
+---
+
+## 🔧 核心技术挑战与成长历程
+
+这个项目中遇到的真实技术难题，记录了我解决问题的完整思路和成长过程：
+
+### 1. AAudio 播放器无法播放音频 - 初次接触音频API的困惑
+
+**问题描述：** 最初遇到的一个主要问题是音频无法播放。通过逐步排查和调试，发现：
+- `AAudioStream` 未正确设置音频流格式，或者流未正确打开
+- 尝试创建 `AAudioStreamBuilder` 并设置音频流参数时，某些地方处理不当，例如未正确调用 `AAudioStreamBuilder_openStream` 或者音频格式设置不匹配
+
+**我的解决过程：**
+- 使用 `AAudio` API 创建流时，确保格式、通道数、采样率等参数正确设置，并调用 `AAudioStream_requestStart` 启动流
+- 增加适当的日志输出，以便在调试过程中及时发现问题
+
+**学习收获：** 第一次深入了解 Android 音频架构，理解了底层音频流的生命周期管理。
+
+### 2. 音频无法正确播放和流的关闭
+
+**遇到的问题：** 播放音频时，发现尽管缓冲区内的数据已被读取，但音频播放仍存在问题，音频流似乎未正常工作
+
+**解决策略：**
+- 通过调试日志查看音频流的状态，并验证 `AAudioStream_write` 是否成功写入数据
+- 确保使用完音频流后，调用 `AAudioStream_requestStop` 和 `AAudioStream_close` 正确关闭流
+
+### 3. 获取和同步音频的 PTS - 时间戳计算的学习
+
+**技术挑战：** 实现音视频同步时，关键问题是如何从音频流中获取正确的播放时间戳（PTS）。尝试使用 `AAudioStream_getFramesWritten` 和 `AAudioStream_getSampleRate` 计算音频的 PTS
+
+**解决方案：**
+- 使用 `AAudioStream_getFramesWritten` 获取已写入的帧数，并通过音频流的采样率计算出时间戳（PTS）
+- 确保音频的时间戳更新与实际播放同步，避免播放过程中出现音频时滞或同步问题
+
+### 4. 音视频同步问题 - 多媒体编程的核心难题
+
+**复杂性认知：** 实现音视频同步时，希望通过获取音频的 PTS 来同步音频和视频播放。然而，音视频线程的同步是复杂过程，尤其要确保时间戳的一致性并避免两者不同步
+
+**创新解决：**
+- 设计一个 **中央时间更新时间线程**，该线程定期更新时间戳，并通过条件变量通知音视频线程
+- 在视频和音频线程中，通过比较当前时间戳与各自的数据 `PTS`，确保视频和音频播放同步
+
+### 5. 线程安全的时间戳变量 - 并发编程实践
+
+**技术学习：** 为确保多个线程安全访问时间戳变量（`currentTime`），使用 `std::atomic` 存储全局的时间戳，并利用 `std::mutex` 和 `std::condition_variable` 控制时间的同步
+
+**实现方案：**
+- 通过 `std::atomic<double>` 存储时间戳，保证线程间的安全访问
+- 使用 `std::condition_variable` 同步不同线程之间的操作，确保音频和视频线程在读取时间戳时不会发生竞争
+
+### 6. 音频和视频线程的时间戳同步
+
+**架构设计：** 音频和视频线程都需依据中央时间戳进行同步。为保证音频和视频同步播放，设计一个专门更新时间的线程来维护音视频的统一时间进度
+
+**技术实现：**
+- 每隔一定时间（每 5 毫秒），时间线程更新时间戳，音频和视频线程通过读取该时间戳决定播放进度
+- 使用 `std::this_thread::sleep_for` 模拟音视频的帧率，并确保两个线程能根据更新的时间戳决定是否继续播放或等待
+
+### 7. 编译成功但播放音视频依旧不同步
+
+**持续问题：** 成功编译并能播放音频和视频后，仍面临音视频不同步的问题，主要是音频的 PTS 和视频的播放进度不一致，导致两者不同步
+
+**系统性解决：**
+- 引入音视频同步机制，确保音频和视频根据各自的 PTS 计算出合适的播放时间
+- 通过调整线程等待时间，确保音频和视频线程可根据时间戳的变化进行播放
+
+### 8. 解码线程（decodeThread）退出后播放中断 - 线程生命周期管理
+
+**关键问题：** 实现视频播放时，遇到一个关键问题：**解码线程（`decodeThread`）执行完后终止，导致视频播放中断**。原本的代码在解码线程完成后便退出，使播放器未继续处理后续的视频帧
+
+**深度调试：**
+- 调试发现 `decodeThread` 线程的退出条件设置不合理，导致其处理完所有的包后直接退出
+- 为让解码线程继续工作，修改退出条件，确保解码线程只有在队列完全消费完且无更多数据时才退出
+- 增加一个机制，当 `packetQueue` 中无更多数据时，解码线程稍作等待，直到有新数据进来，避免线程提前退出
+
+### 9. 解码帧的内存泄漏问题 - 内存管理的重要性
+
+**严重问题：** 播放过程中，设备死机很大程度上是由内存泄漏引起的，特别是在解码阶段，未及时释放已解码的 `AVFrame`。这导致内存不断积累，最终设备内存溢出，系统被强制杀掉
+
+**系统性解决：**
+- 加强内存管理，每次解码并将帧推入队列后，确保及时释放不再使用的帧
+- 特别是使用完 `AVFrame` 后，通过 `av_frame_free()` 确保内存得到正确释放
+- 为避免每次都创建和销毁大量 `AVFrame` 对象，实现帧的复用机制，避免频繁的内存分配和释放
+
+### 10. Surface 未正确显示导致黑屏 - UI布局问题
+
+**渲染问题：** 将渲染帧通过 OpenGL 渲染到 `SurfaceView` 时，发现渲染输出黑屏。经过调试，发现是因为 `SurfaceView` 未正确设置约束，导致渲染的 Surface 尺寸为 0x0
+
+**UI调试：**
+- 确保 `SurfaceView` 使用 `ConstraintLayout` 时，添加正确的约束（`layout_constraintTop_toTopOf`、`layout_constraintStart_toStartOf` 等），使 `SurfaceView` 能够正确渲染到屏幕上
+- 同时，在 `SurfaceView` 中设置调试背景色，确保视图显示正常，并进一步验证 `Surface` 在渲染时的宽高正确
+
+### 11. EGL 初始化重复问题 - OpenGL上下文管理
+
+**图形渲染问题：** 实现渲染后，发现在播放过程中，`EGL` 被重复初始化，导致渲染输出异常或黑屏。重复初始化 EGL 会破坏现有的上下文，导致图形渲染失败
+
+**技术方案：**
+- 使用 `std::mutex` 加锁，确保每次只初始化一次 `EGL` 上下文
+- 每次渲染前，检查 `EGL` 是否已经初始化，仅在必要时重新初始化
+- 此外，增加对 `Surface` 和 `EGLContext` 的管理，确保在 `Surface` 或视图尺寸变化时，能够安全地重建 `EGL` 上下文
+
+### 12. 重复解码导致的性能问题 - 性能优化实践
+
+**性能瓶颈：** 随着播放时间的增加，还遇到了解码性能逐渐下降的问题，尤其是帧队列中积压了大量待处理的解码帧，导致解码线程长时间未释放 CPU 资源，影响了播放流畅性
+
+**优化策略：**
+- 为避免解码线程被帧队列中的数据积压，设计一个最大缓存机制，限制帧队列中最多缓存的帧数，避免解码线程长时间被阻塞
+- 另外，通过减少渲染线程的渲染频率（如调整帧率）来减轻 GPU 和 CPU 的负担，提高整体性能
+
+### 13. 解码帧的 linesize 为 0 - 数据格式处理
+
+**数据问题：** 播放过程中，遇到解码帧的 `linesize[0]` 值为 0 的问题，导致图像无法正确渲染。经过调试，发现是在解码和转换为 RGBA 格式的过程中，未正确处理帧的数据格式或内存分配问题
+
+**解决方案：**
+- 确保每次解码后都为 RGBA 帧分配新的内存，并使用 `sws_scale()` 转换为 RGBA 格式
+- 同时，增加 `linesize` 的有效性检查，确保每帧的 `linesize` 不为零，避免空帧的渲染
+
+---
+
+## 💡 项目架构与技术总结
+
+通过整个开发过程，我逐步搭建了一个完整的多线程音视频播放器架构：
+
+```
+┌─────────────────────────────────────────┐
+│              Android App                │
+│  ┌─────────────┐  ┌─────────────────────┐ │
+│  │MainActivity │  │    Player.java      │ │
+│  └─────────────┘  └─────────────────────┘ │
+└─────────────────────────────────────────┘
+                    │ JNI
+┌─────────────────────────────────────────┐
+│               C++ Core                  │
+│  ┌─────────────┐  ┌─────────────────────┐ │
+│  │ Demux Thread│  │    Timer Thread     │ │
+│  └─────────────┘  └─────────────────────┘ │
+│  ┌─────────────┐  ┌─────────────────────┐ │
+│  │Decode Thread│  │   Render Thread     │ │
+│  └─────────────┘  └─────────────────────┘ │
+│  ┌─────────────┐  ┌─────────────────────┐ │
+│  │AudioDec Thrd│  │  AAudio Thread      │ │
+│  └─────────────┘  └─────────────────────┘ │
+└─────────────────────────────────────────┘
+                    │
+┌─────────────────────────────────────────┐
+│            FFmpeg + System              │
+│   FFmpeg Libraries    │   AAudio API    │
+│   OpenGL ES          │   Surface API    │
+└─────────────────────────────────────────┘
+```
+
+### 学习总结
+
+通过这个项目，我不仅实现了一个功能完整的音视频播放器，更重要的是：
+
+**技术成长：**
+- 掌握了 FFmpeg 的使用和多媒体编程基础
+- 理解了音视频同步的核心原理和实现方法
+- 学会了复杂多线程程序的设计和调试
+- 熟悉了 Android Native 开发和 OpenGL 图形编程
+
+**解决问题的能力：**
+- 从最初的编译错误到最终的复杂同步问题，每个挑战都锻炼了我的问题分析和解决能力
+- 学会了使用日志、调试器等工具进行系统性的问题定位
+- 培养了面对复杂技术问题时的耐心和持续学习的态度
+
+**系统性思维：**
+- 理解了从需求分析到架构设计，再到具体实现的完整开发流程
+- 学会了在复杂系统中平衡功能实现、性能优化和代码可维护性
+
+通过整个过程，逐步解决了音视频播放中的多个技术难题，从音频播放、音视频同步到渲染线程的内存管理、线程同步等问题。通过调试、日志和条件变量等手段逐步排除错误，最终实现了基础的音视频播放功能。
+
+---
+
+*这个项目记录了我在音视频开发领域从零基础到能够独立解决复杂技术问题的完整学习历程。每一个挑战都是宝贵的学习机会，每一次突破都让我对技术的理解更加深入。*
